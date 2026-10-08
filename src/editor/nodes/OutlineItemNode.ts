@@ -11,6 +11,7 @@ import {
   type SerializedElementNode,
   type Spread,
 } from 'lexical';
+import { getBlockSelectedIds } from '../blockSelectionStore';
 import { getStatusDef } from '../../settings/settingsStore';
 import type { HeadingLevel, ItemKind } from '../../types';
 
@@ -224,17 +225,21 @@ export class OutlineItemNode extends ElementNode {
     }
     chip.style.setProperty('--status-color', status.color);
     // Reserve content indent for the absolutely positioned chip.
-    dom.style.setProperty(
-      '--outline-chip-indent',
-      `${Math.max(2.6, status.label.length * 0.42 + 0.85)}em`,
-    );
-    requestAnimationFrame(() => {
-      if (!chip?.isConnected || !dom.isConnected) return;
-      const w = chip.getBoundingClientRect().width;
-      if (w > 0) {
-        dom.style.setProperty('--outline-chip-indent', `${Math.ceil(w)}px`);
-      }
-    });
+    // Skip layout measure when the label hasn't changed (hot during typing elsewhere).
+    if (chip.dataset.measuredLabel !== status.label) {
+      dom.style.setProperty(
+        '--outline-chip-indent',
+        `${Math.max(2.6, status.label.length * 0.42 + 0.85)}em`,
+      );
+      chip.dataset.measuredLabel = status.label;
+      requestAnimationFrame(() => {
+        if (!chip?.isConnected || !dom.isConnected) return;
+        const w = chip.getBoundingClientRect().width;
+        if (w > 0) {
+          dom.style.setProperty('--outline-chip-indent', `${Math.ceil(w)}px`);
+        }
+      });
+    }
   }
 
   private buildClassName(): string {
@@ -242,7 +247,16 @@ export class OutlineItemNode extends ElementNode {
     if (this.__kind === 'heading' && this.__headingLevel) {
       parts.push(`outline-item--h${this.__headingLevel}`);
     }
-    if (this.__blockSelected) parts.push('outline-item--selected');
+    // Prefer live store so Lexical DOM updates don't wipe selection chrome.
+    const selected =
+      this.__blockSelected || getBlockSelectedIds().has(this.__id);
+    if (selected) {
+      parts.push('outline-item--selected');
+      const parent = this.getParent();
+      const parentSelected =
+        $isOutlineItemNode(parent) && getBlockSelectedIds().has(parent.getId());
+      if (!parentSelected) parts.push('outline-item--drag-root');
+    }
     return parts.join(' ');
   }
 

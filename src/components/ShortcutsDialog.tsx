@@ -62,12 +62,13 @@ const SECTIONS: Section[] = [
       { keys: [alt, 'Drag'], action: 'Multi-select without gutter' },
       {
         keys: ['Select text'],
-        action: 'Select those blocks for drag (clears when you type)',
+        action: 'Select those blocks (click anywhere to clear)',
       },
       {
-        keys: ['Drag selection'],
+        keys: ['Drag handle'],
         action: 'Move selection between items (adopts that level)',
       },
+      { keys: ['Click'], action: 'Clear block selection' },
       { keys: ['Triple-click'], action: 'Select block' },
     ],
   },

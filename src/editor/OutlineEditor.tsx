@@ -12,7 +12,6 @@ import { IndentReorderPlugin } from './plugins/IndentReorderPlugin';
 import { RolePlugin } from './plugins/RolePlugin';
 import { StatusChipPlugin } from './plugins/StatusChipPlugin';
 import { BlockSelectionPlugin } from './plugins/BlockSelectionPlugin';
-import { FormatPlugin } from './plugins/FormatPlugin';
 import { OutlineLinkPlugin } from './plugins/LinkPlugin';
 import { OutlineAutoLinkPlugin } from './plugins/AutoLinkPlugin';
 import { PersistencePlugin } from './plugins/PersistencePlugin';
@@ -87,7 +86,6 @@ export const OutlineEditor = memo(function OutlineEditor({
         <RolePlugin />
         <StatusChipPlugin />
         <BlockSelectionPlugin />
-        <FormatPlugin />
         <OutlineAutoLinkPlugin />
         <OutlineLinkPlugin />
         <PersistencePlugin

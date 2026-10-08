@@ -67,10 +67,17 @@ export default function App() {
   const [docsCache, setDocsCache] = useState<Map<string, DayDocument>>(
     () => new Map(),
   );
+  const [isNarrow, setIsNarrow] = useState(
+    () =>
+      typeof window !== 'undefined' &&
+      window.matchMedia('(max-width: 768px)').matches,
+  );
   const docsCacheRef = useRef(docsCache);
   const activeDateRef = useRef(activeDate);
+  const isNarrowRef = useRef(isNarrow);
   docsCacheRef.current = docsCache;
   activeDateRef.current = activeDate;
+  isNarrowRef.current = isNarrow;
 
   useEffect(() => {
     const onOnline = () => {
@@ -90,10 +97,27 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    const mq = window.matchMedia('(max-width: 768px)');
+    const onChange = () => {
+      const narrow = mq.matches;
+      setIsNarrow(narrow);
+      // Phone-width: start with the editor; open nav via the menu button.
+      if (narrow) setSettings({ sidebarCollapsed: true });
+    };
+    onChange();
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+
+  useEffect(() => {
     return subscribeSettings((next) => {
       setSidebarCollapsed(next.sidebarCollapsed);
       setDeveloperMode(next.developerMode);
     });
+  }, []);
+
+  const collapseSidebarIfNarrow = useCallback(() => {
+    if (isNarrowRef.current) setSettings({ sidebarCollapsed: true });
   }, []);
 
   useEffect(() => {
@@ -145,6 +169,13 @@ export default function App() {
     setActiveDate(today);
     setActiveDoc(todayDoc);
     setGate({ status: 'ready', handle, folderName: handle.name });
+    // Folder settings may reopen the sidebar; keep phones on the editor.
+    if (
+      isNarrowRef.current ||
+      window.matchMedia('(max-width: 768px)').matches
+    ) {
+      setSettings({ sidebarCollapsed: true });
+    }
     debugLog(
       'info',
       'fs',
@@ -279,35 +310,43 @@ export default function App() {
     [gate, mergeSidebar],
   );
 
-  const selectDay = useCallback(async (date: string) => {
-    if (date === activeDateRef.current) return;
-    // Flush current via cache; disk already debounced
-    const cached = docsCacheRef.current.get(date);
-    if (cached) {
-      debugLog('info', 'nav', `day ${date}`, 'from cache');
-      setActiveDate(date);
-      setActiveDoc(cached);
-      return;
-    }
-    try {
-      const t0 = performance.now();
-      const fromDisk = await notesClient.loadDay(date);
-      const doc = fromDisk ?? emptyDayDocument(date);
-      setDocsCache((prev) => new Map(prev).set(date, doc));
-      setActiveDate(date);
-      setActiveDoc(doc);
-      debugLog(
-        'info',
-        'nav',
-        `day ${date}`,
-        `${fromDisk ? 'from disk' : 'empty'} · ${Math.round(performance.now() - t0)}ms`,
-      );
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      debugLog('error', 'nav', `day ${date} failed`, msg);
-      showErrorToast(msg);
-    }
-  }, []);
+  const selectDay = useCallback(
+    async (date: string) => {
+      if (date === activeDateRef.current) {
+        collapseSidebarIfNarrow();
+        return;
+      }
+      // Flush current via cache; disk already debounced
+      const cached = docsCacheRef.current.get(date);
+      if (cached) {
+        debugLog('info', 'nav', `day ${date}`, 'from cache');
+        setActiveDate(date);
+        setActiveDoc(cached);
+        collapseSidebarIfNarrow();
+        return;
+      }
+      try {
+        const t0 = performance.now();
+        const fromDisk = await notesClient.loadDay(date);
+        const doc = fromDisk ?? emptyDayDocument(date);
+        setDocsCache((prev) => new Map(prev).set(date, doc));
+        setActiveDate(date);
+        setActiveDoc(doc);
+        debugLog(
+          'info',
+          'nav',
+          `day ${date}`,
+          `${fromDisk ? 'from disk' : 'empty'} · ${Math.round(performance.now() - t0)}ms`,
+        );
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        debugLog('error', 'nav', `day ${date} failed`, msg);
+        showErrorToast(msg);
+      }
+      collapseSidebarIfNarrow();
+    },
+    [collapseSidebarIfNarrow],
+  );
 
   const selectItem = useCallback(
     async (date: string, itemId: string) => {
@@ -316,8 +355,9 @@ export default function App() {
       }
       setFocusItemId(itemId);
       debugLog('debug', 'nav', 'focus item', itemId.slice(0, 8));
+      collapseSidebarIfNarrow();
     },
-    [selectDay],
+    [collapseSidebarIfNarrow, selectDay],
   );
 
   const insertDummyHierarchy = useCallback(() => {
@@ -412,6 +452,14 @@ export default function App() {
         </div>
       </header>
       <div className="app__body">
+        {!sidebarCollapsed && isNarrow && (
+          <button
+            type="button"
+            className="sidebar-backdrop"
+            aria-label="Close notes navigation"
+            onClick={() => setSettings({ sidebarCollapsed: true })}
+          />
+        )}
         <Sidebar
           days={displaySidebar}
           activeDate={activeDate}

@@ -89,6 +89,11 @@ body,
   margin: 0;
 }
 
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 body {
   font-family: var(--font-display);
   color: var(--ink);
@@ -100,6 +105,9 @@ body {
   /* UI chrome is non-selectable so ⌘A only hits the Lexical document */
   user-select: none;
   -webkit-user-select: none;
+  /* Notch / home-indicator safe areas (PWA standalone) */
+  padding: env(safe-area-inset-top) env(safe-area-inset-right)
+    env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 
 /* Editable Lexical text (and form fields in dialogs) may be selected */
@@ -395,13 +403,19 @@ button {
 }
 
 .topbar {
+  --topbar-pad-y: 0.28rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0.65rem;
-  padding: 0.28rem 0.65rem;
+  padding: var(--topbar-pad-y) 0.65rem;
   border-bottom: 1px solid color-mix(in srgb, var(--line) 55%, transparent);
-  background: transparent;
+  background: color-mix(in srgb, var(--paper) 92%, transparent);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  position: sticky;
+  top: 0;
+  z-index: 60;
 }
 
 .topbar__left {
@@ -633,7 +647,8 @@ button {
   --outline-nest: 1.25rem;
   min-width: 0;
   overflow: auto;
-  padding: 1.25rem 1.5rem 3rem;
+  /* Right pad mirrors date inset (outer pad + --outline-label) */
+  padding: 1.25rem calc(1.5rem + var(--outline-label)) 3rem 1.5rem;
 }
 
 .main__day {
@@ -714,7 +729,8 @@ button {
 
 .editor-shell {
   position: relative;
-  max-width: 46rem;
+  width: 100%;
+  max-width: none;
 }
 
 .editor-input {
@@ -926,9 +942,45 @@ button {
   background: color-mix(in srgb, var(--accent-soft) 70%, transparent);
 }
 
+/*
+ * Selection chrome: pull the highlight left so bullets sit inside it with
+ * a little horizontal padding (content position stays put).
+ */
 .outline-item--selected {
+  --outline-sel-pad: 0.45rem;
+  margin-left: calc(-1 * var(--outline-sel-pad));
+  padding-left: calc(var(--outline-pad) + var(--outline-sel-pad));
   background: color-mix(in srgb, var(--accent-soft) 70%, transparent);
-  border-radius: 2px;
+  border-radius: 4px;
+}
+
+.outline-item .outline-item.outline-item--selected {
+  margin-left: calc(var(--outline-nest) - var(--outline-sel-pad));
+}
+
+.outline-item--selected:has(> .outline-status-chip) {
+  padding-left: calc(
+    var(--outline-pad) + var(--outline-sel-pad) +
+      var(--outline-chip-indent, 3.25em) + var(--outline-gap)
+  );
+}
+
+/* Keep bullet / label / chip aligned with text after the left extend */
+.outline-item--selected::before {
+  left: calc(var(--outline-bullet-x) + var(--outline-sel-pad));
+}
+
+.outline-item--selected[data-kind-label]::after {
+  left: var(--outline-sel-pad);
+}
+
+.outline-item .outline-item.outline-item--selected[data-kind-label]::after {
+  left: auto;
+  right: calc(100% - var(--outline-bullet-x) - var(--outline-sel-pad));
+}
+
+.outline-item--selected > .outline-status-chip {
+  left: calc(var(--outline-chip-x) + var(--outline-sel-pad));
 }
 
 /* Selected parent visually includes descendants */
@@ -940,24 +992,73 @@ button {
   background: color-mix(in srgb, var(--accent-soft) 70%, transparent);
 }
 
-.outline-item--drop-before::after,
-.outline-item--drop-after::after {
-  content: '';
+/* Drag handles live in an overlay — never inside contenteditable item DOM */
+.outline-block-handle-layer {
   position: absolute;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: var(--accent);
+  inset: 0;
+  z-index: 5;
   pointer-events: none;
-  z-index: 2;
+  overflow: visible;
 }
 
-.outline-item--drop-before::after {
-  top: -1px;
+.outline-block-handle {
+  position: absolute;
+  transform: translateY(-50%);
+  z-index: 6;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.15rem;
+  height: 1.35rem;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 3px;
+  background: var(--ink);
+  color: var(--paper);
+  cursor: grab;
+  pointer-events: auto;
+  user-select: none;
+  -webkit-user-select: none;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--paper) 35%, transparent);
 }
 
-.outline-item--drop-after::after {
-  bottom: -1px;
+.outline-block-handle:hover {
+  background: var(--accent);
+  color: var(--paper);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 80%, var(--paper));
+}
+
+.outline-block-handle:active,
+.editor-input.block-moving ~ .outline-block-handle-layer .outline-block-handle,
+.editor-shell:has(.editor-input.block-moving) .outline-block-handle {
+  cursor: grabbing;
+}
+
+.outline-block-handle__grip {
+  display: block;
+  width: 0.55rem;
+  height: 0.85rem;
+  background-image: radial-gradient(
+    circle,
+    currentColor 1.1px,
+    transparent 1.25px
+  );
+  background-size: 50% 33.33%;
+  background-position: 0 0;
+  opacity: 0.95;
+}
+
+/*
+ * Drop line via box-shadow — ::before/::after are already used for bullet +
+ * kind label, so a ::after indicator was vertically centered on project/task rows.
+ */
+.outline-item--drop-before {
+  box-shadow: 0 -2px 0 0 var(--accent);
+}
+
+.outline-item--drop-after {
+  box-shadow: 0 2px 0 0 var(--accent);
 }
 
 .editor-input.block-dragging,
@@ -1008,16 +1109,163 @@ button {
   font-weight: 600;
 }
 
-@media (max-width: 720px) {
+.sidebar-backdrop {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  :root {
+    --sidebar-w: min(18.5rem, 86vw);
+    --outline-label: 2.6rem;
+    --outline-gap: 0.4rem;
+    --outline-nest: 1.05rem;
+  }
+
   .app__body,
   .app--sidebar-collapsed .app__body {
     grid-template-columns: 1fr;
   }
 
+  .topbar {
+    --topbar-pad-y: 0.4rem;
+    padding-left: max(0.65rem, env(safe-area-inset-left));
+    padding-right: max(0.65rem, env(safe-area-inset-right));
+  }
+
+  .topbar__brand {
+    font-size: 0.68rem;
+  }
+
+  .sidebar-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 45;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: var(--dialog-backdrop);
+    cursor: pointer;
+    -webkit-backdrop-filter: blur(2px);
+    backdrop-filter: blur(2px);
+  }
+
   .sidebar {
-    border-right: 0;
-    border-bottom: 1px solid var(--line);
-    max-height: 40vh;
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 50;
+    width: var(--sidebar-w);
+    max-height: none;
+    border-right: 1px solid var(--line);
+    border-bottom: 0;
+    padding-top: max(0.75rem, env(safe-area-inset-top));
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+    background: color-mix(in srgb, var(--paper) 94%, transparent);
+    -webkit-backdrop-filter: blur(18px) saturate(1.15);
+    backdrop-filter: blur(18px) saturate(1.15);
+    box-shadow: 8px 0 32px color-mix(in srgb, #000 22%, transparent);
+  }
+
+  .main {
+    padding: 0.85rem
+      calc(max(0.9rem, env(safe-area-inset-right)) + var(--outline-label))
+      2.5rem max(0.9rem, env(safe-area-inset-left));
+  }
+
+  .main__day {
+    font-size: 1.15rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .editor-input {
+    min-height: 50vh;
+    font-size: max(1rem, var(--editor-font-size));
+  }
+
+  .top-menu__panel {
+    position: fixed;
+    right: max(0.5rem, env(safe-area-inset-right));
+    left: max(0.5rem, env(safe-area-inset-left));
+    top: auto;
+    width: auto;
+    max-height: min(70vh, 28rem);
+    overflow: auto;
+  }
+
+  .debug-overlay {
+    left: 0.4rem;
+    right: 0.4rem;
+    bottom: max(0.4rem, env(safe-area-inset-bottom));
+    width: auto;
+    height: min(50vh, 22rem);
+  }
+
+  .gate {
+    padding: 1.25rem 1.1rem;
+    padding-top: max(1.25rem, env(safe-area-inset-top));
+    padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
+  }
+
+  .gate__title {
+    font-size: clamp(1.55rem, 7vw, 2.1rem);
+  }
+
+  .shortcuts-overlay,
+  .settings-overlay {
+    padding: 0.5rem;
+    padding-top: max(0.5rem, env(safe-area-inset-top));
+    padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+    align-items: end;
+  }
+
+  .shortcuts-dialog,
+  .settings-dialog {
+    width: 100%;
+    max-height: min(92vh, 40rem);
+    height: auto;
+    min-height: 0;
+    border-radius: 8px 8px 0 0;
+  }
+
+  .toast-host {
+    bottom: max(1rem, env(safe-area-inset-bottom));
+    width: min(24rem, calc(100vw - 1rem));
+  }
+}
+
+@media (pointer: coarse) {
+  .btn--icon-sm {
+    width: 2.5rem;
+    height: 2.5rem;
+    min-width: 2.5rem;
+  }
+
+  .btn--nav {
+    --btn-py: 0.45rem;
+    --btn-px: 0.7rem;
+    --btn-fs: 0.68rem;
+  }
+
+  .btn--sm {
+    --btn-py: 0.35rem;
+    --btn-px: 0.55rem;
+  }
+
+  .sidebar__day-btn,
+  .sidebar__project-btn,
+  .sidebar__task-btn {
+    min-height: 2.5rem;
+    padding-top: 0.45rem;
+    padding-bottom: 0.45rem;
+  }
+
+  /* Avoid iOS zoom-on-focus for settings fields */
+  .settings-field__control,
+  .font-picker__input {
+    font-size: 1rem;
   }
 }
 

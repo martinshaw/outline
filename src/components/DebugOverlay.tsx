@@ -493,12 +493,23 @@ export function DebugOverlay({
   useEffect(() => {
     if (!enabled) return;
 
+    let selRaf: number | null = null;
+    let debugRaf: number | null = null;
+
     const unsubSel = subscribeBlockSelection(() => {
-      setSelected([...getBlockSelectedIds()]);
+      if (selRaf != null) return;
+      selRaf = requestAnimationFrame(() => {
+        selRaf = null;
+        setSelected([...getBlockSelectedIds()]);
+      });
     });
     const unsubDebug = subscribeDebug(() => {
-      setSave(getSaveDebugState());
-      setLogs([...getDebugLogs()]);
+      if (debugRaf != null) return;
+      debugRaf = requestAnimationFrame(() => {
+        debugRaf = null;
+        setSave(getSaveDebugState());
+        setLogs([...getDebugLogs()]);
+      });
     });
     setSave(getSaveDebugState());
     setLogs([...getDebugLogs()]);
@@ -507,12 +518,14 @@ export function DebugOverlay({
     // Pending-age clock only matters on Overview.
     let tick: number | undefined;
     if (tab === 'overview') {
-      tick = window.setInterval(() => setNow(Date.now()), 250);
+      tick = window.setInterval(() => setNow(Date.now()), 500);
     }
 
     return () => {
       unsubSel();
       unsubDebug();
+      if (selRaf != null) cancelAnimationFrame(selRaf);
+      if (debugRaf != null) cancelAnimationFrame(debugRaf);
       if (tick != null) window.clearInterval(tick);
     };
   }, [enabled, tab]);

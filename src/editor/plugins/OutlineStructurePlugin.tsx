@@ -266,17 +266,20 @@ export function OutlineStructurePlugin(): null {
       editor.registerUpdateListener(({ editorState }) => {
         editorState.read(() => {
           const root = $getRoot();
-          // Fast path: most updates leave at least one child.
-          if (root.getChildrenSize() > 0) {
-            const first = root.getFirstChild();
-            if ($isOutlineItemNode(first) || root.getChildren().some($isOutlineItemNode)) {
-              return;
-            }
+          // Fast path: walk siblings without allocating getChildren().
+          let child = root.getFirstChild();
+          while (child) {
+            if ($isOutlineItemNode(child)) return;
+            child = child.getNextSibling();
           }
           queueMicrotask(() => {
             editor.update(() => {
               const r = $getRoot();
-              if (r.getChildren().some($isOutlineItemNode)) return;
+              let c = r.getFirstChild();
+              while (c) {
+                if ($isOutlineItemNode(c)) return;
+                c = c.getNextSibling();
+              }
               const node = $createOutlineItemNode(createId(), 'note');
               node.append($createTextNode(''));
               r.append(node);
