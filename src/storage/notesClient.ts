@@ -5,14 +5,17 @@ import {
 } from '../settings/settingsStore';
 import type { DayDocument, SidebarDay } from '../types';
 import { buildSidebarFromDocs } from '../utils/outline';
+import { isDebugEnabled } from './debugStore';
 import {
   deleteDay as fsDeleteDay,
   getFolderName,
+  listDirectoryEntries,
   loadAllDays,
   loadAppSettings,
   loadDay as fsLoadDay,
   saveAppSettings,
   saveDay as fsSaveDay,
+  type FsEntry,
 } from './fs';
 
 /**
@@ -80,6 +83,12 @@ class NotesClient {
 
   async parseSidebar(docs: DayDocument[]): Promise<SidebarDay[]> {
     return buildSidebarFromDocs(docs);
+  }
+
+  /** Debug panel only — no-ops when developer mode is off. */
+  async listDirectory(path: string[] = []): Promise<FsEntry[]> {
+    if (!isDebugEnabled()) return [];
+    return listDirectoryEntries(this.requireRoot(), path);
   }
 }
 

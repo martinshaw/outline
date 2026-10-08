@@ -67,7 +67,7 @@ export function FolderGate({
             </p>
             <button
               type="button"
-              className="gate__btn"
+              className="btn btn--primary btn--lg btn--block"
               onClick={onGrantPermission}
               disabled={busy}
             >
@@ -75,7 +75,7 @@ export function FolderGate({
             </button>
             <button
               type="button"
-              className="gate__btn gate__btn--secondary"
+              className="btn btn--secondary btn--lg btn--block"
               onClick={onOpenFolder}
               disabled={!supportsFs || busy}
             >
@@ -85,7 +85,7 @@ export function FolderGate({
         ) : (
           <button
             type="button"
-            className="gate__btn"
+            className="btn btn--primary btn--lg btn--block"
             onClick={onOpenFolder}
             disabled={!supportsFs || busy}
           >
@@ -96,6 +96,15 @@ export function FolderGate({
                 : 'Open notes folder'}
           </button>
         )}
+
+        <a
+          className="gate__github"
+          href="https://github.com/martinshaw/outline"
+          target="_blank"
+          rel="noreferrer"
+        >
+          GitHub
+        </a>
       </div>
     </div>
   );

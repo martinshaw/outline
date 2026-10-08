@@ -250,3 +250,28 @@ export async function saveAppSettings(
 ): Promise<void> {
   await writeJsonFile(root, SETTINGS_FILE, settings);
 }
+
+export type FsEntry = {
+  name: string;
+  kind: 'file' | 'directory';
+};
+
+/** List immediate children of a directory under the workspace root. */
+export async function listDirectoryEntries(
+  root: FileSystemDirectoryHandle,
+  path: string[] = [],
+): Promise<FsEntry[]> {
+  let dir = root;
+  for (const segment of path) {
+    dir = await dir.getDirectoryHandle(segment);
+  }
+  const entries: FsEntry[] = [];
+  for await (const handle of dir.values()) {
+    entries.push({ name: handle.name, kind: handle.kind });
+  }
+  entries.sort((a, b) => {
+    if (a.kind !== b.kind) return a.kind === 'directory' ? -1 : 1;
+    return a.name.localeCompare(b.name);
+  });
+  return entries;
+}

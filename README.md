@@ -1,6 +1,6 @@
 # Outline
 
-**Version 0.6.0** · [Live demo](https://martinshaw.github.io/outline/) · [Repository](https://github.com/martinshaw/outline)
+**Version 0.7.0** · [Live demo](https://martinshaw.github.io/outline/) · [Repository](https://github.com/martinshaw/outline)
 
 Local-first chronological outline editor inspired by [LogSeq](https://logseq.com). Notes live in a folder on your computer via Chrome’s File System Access API — no account, no server, no sync backend.
 
@@ -45,6 +45,7 @@ Built with [React](https://react.dev), [Lexical](https://lexical.dev), [Vite](ht
 | **Nested outliner** | Indent, outdent, and reorder with LogSeq-style tree moves |
 | **Projects & tasks** | Promote blocks; tasks nest under projects |
 | **Status chips** | Inline coloured chips on projects/tasks; configurable statuses |
+| **Kind labels** | Quiet gutter labels for projects, tasks, and heading levels |
 | **Headings** | Markdown `#` … `######` + space → heading blocks (levels 1–6) |
 | **Sidebar** | Navigate days → projects → tasks; collapse state persisted |
 | **Rich text** | Bold, italic, underline |
@@ -53,8 +54,8 @@ Built with [React](https://react.dev), [Lexical](https://lexical.dev), [Vite](ht
 | **Exports** | Day or selection as JSON, YAML, Markdown, text, or HTML |
 | **Backups** | Snapshot notes edited yesterday when you first write today |
 | **Settings** | Stored as `settings.json` in your workspace folder |
-| **Developer panel** | Optional bottom-right debug log (Settings → Developer) |
-| **Theme** | System, light, or dark |
+| **Developer panel** | Optional bottom-right panel: Overview, Nodes, Files (off by default) |
+| **Theme** | System, light, or dark (flat dark; no decorative page glow) |
 | **Fonts** | Built-in + searchable system fonts (Local Font Access) |
 | **Offline PWA** | App shell caches after first visit; data stays on disk |
 
@@ -70,6 +71,8 @@ Built with [React](https://react.dev), [Lexical](https://lexical.dev), [Vite](ht
 
 Safari and Firefox are **not** supported for folder persistence.
 
+**Embedded / IDE browsers are not supported** — including Cursor’s Simple Browser / integrated browser preview. Those environments typically lack a working File System Access API (and sometimes a proper secure context), so folder pick and persistence will fail. Open the Vite URL in desktop Chrome instead (e.g. `http://localhost:5173`).
+
 ---
 
 ## Quick start
@@ -79,14 +82,14 @@ npm install
 npm run dev
 ```
 
-Open the URL Vite prints (typically `http://localhost:5173`).
+Open the URL Vite prints in **desktop Chrome** (typically `http://localhost:5173`). Do not use Cursor’s integrated browser — see [Requirements](#requirements).
 
-1. Click **Open notes folder**
+1. On the setup screen, click **Open notes folder** (repo link is at the bottom of that screen)
 2. Choose an existing directory or create a new one
-3. Grant read/write permission when Chrome prompts
+3. Grant read/write permission when Chrome prompts — prefer **Allow on every visit** so you are not asked every reload
 4. Start typing in today’s outline
 
-The folder handle is remembered in IndexedDB. On later visits you may need to click once to re-grant permission.
+The folder handle is remembered in IndexedDB. On later visits you may still need one click to re-grant permission if you did not allow every visit.
 
 ### Production build
 
@@ -125,9 +128,9 @@ Serve `dist/` over HTTPS (or localhost) if you host it yourself.
 | Kind | How you get it | Marker |
 |------|----------------|--------|
 | **Note** | Default | Hollow circle |
-| **Heading** | Type `#` … `######` then space at the start of a block | Hollow circle + larger type |
-| **Project** | `⌘Enter` / `Ctrl+Enter` on a note/heading (not under a project) | Circle + **status chip** |
-| **Task** | `⌘Enter` / `Ctrl+Enter` on a note/heading **under** a project | Circle + **status chip** |
+| **Heading** | Type `#` … `######` then space at the start of a block | Hollow circle + larger type + `H1`…`H6` gutter label |
+| **Project** | `⌘Enter` / `Ctrl+Enter` on a note/heading (not under a project) | Circle + **status chip** + `PROJECT` gutter label |
+| **Task** | `⌘Enter` / `Ctrl+Enter` on a note/heading **under** a project | Circle + **status chip** + `TASK` gutter label |
 
 On a **project** or **task**, `⌘Enter` / `Ctrl+Enter` **cycles status** (does not demote to a note). Backspace at the start of a **heading** demotes it to a note.
 
@@ -170,10 +173,11 @@ With a **block selection**, Tab, Shift+Tab, and move shortcuts apply to the whol
 | `Shift`+click gutter | Extend selection |
 | `Alt`+drag on items | Multi-select without the gutter |
 | Drag selection (gutter) | Move blocks between items; adopts that nesting level |
+| Drag across text | Starts a text selection, then switches to block selection as you drag |
 | Triple-click | Select block |
 | `Esc` | Clear selection |
 
-Selected blocks include nested children for move/indent where applicable. Selection is used for **Export selection**.
+Selected blocks include nested children for move/indent where applicable. Selection is used for **Export selection**. UI chrome (sidebar, menus, chips) is non-selectable so `⌘A` / `Ctrl+A` targets the outline.
 
 ### Menu
 
@@ -203,7 +207,17 @@ Open **Menu → Settings…**. Preferences are saved as **`settings.json`** in t
 | **Backups → When to backup** | On next day’s first write (default), or Off |
 | **Backups → Folder name** | Sibling of `notes/` (default `backups`) |
 | **Saving → Autosave delay** | 250 ms – 1.5 s |
-| **Developer → Show developer panel** | Bottom-right stats + event log (off by default; no data collected until enabled) |
+| **Developer → Show developer panel** | Bottom-right debug UI (off by default; no logging or I/O until enabled) |
+
+When the developer panel is on, tabs are:
+
+| Tab | Contents |
+|-----|----------|
+| **Overview** | Session / day / save / settings snapshot + live event log |
+| **Nodes** | Live outline tree for the active day (kind, id, title; focus & block selection highlighted) |
+| **Files** | Lazy workspace directory tree (notes, settings, backups, …) |
+
+Changing a setting (including dropdowns) keeps you on the current settings section. Closing the panel (×) or unchecking the setting turns developer mode off.
 
 **Reset to defaults** (sidebar of the settings dialog) restores built-in values.
 
@@ -399,8 +413,9 @@ Optional install: Chrome → install icon / “Install Outline” for a standalo
 
 | Problem | What to try |
 |---------|-------------|
-| **Open notes folder** does nothing | Use Chrome on desktop; ensure `localhost` or HTTPS |
+| **Open notes folder** does nothing | Use desktop Chrome on `localhost` or HTTPS — not Cursor’s integrated browser / IDE Simple Browser |
 | Stuck on permission screen | Click the prompt; check the site isn’t blocked from file access |
+| Works in Chrome but blank/broken in Cursor preview | Expected — open the app in Chrome; File System Access isn’t available in that embedded browser |
 | Changes not on disk | Watch for error toasts; confirm the folder still exists and is writable |
 | Settings reset after reopening | Confirm `settings.json` exists in the workspace root and is writable |
 | Old day missing from sidebar | Empty days are deleted; check `backups/` for a prior snapshot |
@@ -426,11 +441,12 @@ Optional install: Chrome → install icon / “Install Outline” for a standalo
 
 | Path | Role |
 |------|------|
-| `src/editor/` | Lexical editor, outline nodes, plugins (indent, selection, status chips, links) |
-| `src/storage/` | Folder I/O, saves, backups, `settings.json`, change log |
+| `src/editor/` | Lexical editor, outline nodes, plugins (indent, selection, status chips, links, headings) |
+| `src/storage/` | Folder I/O, saves, backups, `settings.json`, change log, debug store |
 | `src/settings/` | Preferences model, normalisation, Local Font Access |
 | `src/sidebar/` | Day / project / task navigation |
-| `src/components/` | Menu, settings/shortcuts dialogs, toasts, font picker |
+| `src/components/` | Gate, menu, settings/shortcuts dialogs, developer panel, toasts, font picker |
+| `src/assets/patterns/` | Setup-page background tile |
 | `src/utils/export.ts` | Export serializers |
 | `src/types.ts` | Shared document types |
 | `.github/workflows/` | GitHub Pages deploy |

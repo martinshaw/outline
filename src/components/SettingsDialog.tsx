@@ -58,6 +58,8 @@ function fontPickerValue(settings: AppSettings): FontPickerValue {
 export function SettingsDialog({ open, onClose }: Props) {
   const titleId = useId();
   const closeRef = useRef<HTMLButtonElement>(null);
+  const onCloseRef = useRef(onClose);
+  const wasOpenRef = useRef(false);
   const [settings, setLocal] = useState<AppSettings>(() => getSettings());
   const [backupDirDraft, setBackupDirDraft] = useState(settings.backupDirectory);
   const [localFamilies, setLocalFamilies] = useState<string[]>([]);
@@ -69,6 +71,8 @@ export function SettingsDialog({ open, onClose }: Props) {
   const sectionLabel =
     SECTIONS.find((s) => s.id === section)?.label ?? 'Settings';
 
+  onCloseRef.current = onClose;
+
   useEffect(() => {
     return subscribeSettings((next) => {
       setLocal(next);
@@ -77,22 +81,32 @@ export function SettingsDialog({ open, onClose }: Props) {
   }, []);
 
   useEffect(() => {
-    if (!open) return;
-    const latest = getSettings();
-    setLocal(latest);
-    setBackupDirDraft(latest.backupDirectory);
-    setLocalStatus(null);
-    setSection('editor');
-    closeRef.current?.focus();
+    if (!open) {
+      wasOpenRef.current = false;
+      return;
+    }
+
+    // Only reset tab/focus when the dialog opens — not when parent re-renders
+    // after a setting change (onClose identity often changes every render).
+    if (!wasOpenRef.current) {
+      wasOpenRef.current = true;
+      const latest = getSettings();
+      setLocal(latest);
+      setBackupDirDraft(latest.backupDirectory);
+      setLocalStatus(null);
+      setSection('editor');
+      closeRef.current?.focus();
+    }
+
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault();
-        onClose();
+        onCloseRef.current();
       }
     };
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
 
@@ -183,7 +197,7 @@ export function SettingsDialog({ open, onClose }: Props) {
           <button
             ref={closeRef}
             type="button"
-            className="settings-dialog__close"
+            className="btn btn--ghost btn--icon"
             aria-label="Close"
             onClick={onClose}
           >
@@ -200,8 +214,8 @@ export function SettingsDialog({ open, onClose }: Props) {
                     type="button"
                     className={
                       section === item.id
-                        ? 'settings-nav__item settings-nav__item--active'
-                        : 'settings-nav__item'
+                        ? 'btn btn--ghost btn--rail btn--block btn--start btn--active'
+                        : 'btn btn--ghost btn--rail btn--block btn--start'
                     }
                     aria-current={section === item.id ? 'page' : undefined}
                     onClick={() => setSection(item.id)}
@@ -213,7 +227,7 @@ export function SettingsDialog({ open, onClose }: Props) {
             </ul>
             <button
               type="button"
-              className="settings-nav__reset"
+              className="btn btn--danger btn--sm btn--block btn--start"
               onClick={() => {
                 resetSettings();
                 setLocalFamilies([]);
@@ -356,7 +370,7 @@ export function SettingsDialog({ open, onClose }: Props) {
                       />
                       <button
                         type="button"
-                        className="settings-status-row__remove"
+                        className="btn btn--danger btn--icon-sm"
                         disabled={settings.statuses.length <= 1}
                         aria-label={`Remove ${status.label}`}
                         onClick={() => removeStatus(index)}
@@ -369,14 +383,14 @@ export function SettingsDialog({ open, onClose }: Props) {
                 <div className="settings-status-actions">
                   <button
                     type="button"
-                    className="settings-field__btn"
+                    className="btn btn--secondary btn--md"
                     onClick={addStatus}
                   >
                     Add status
                   </button>
                   <button
                     type="button"
-                    className="settings-field__btn"
+                    className="btn btn--secondary btn--md"
                     onClick={() =>
                       setSettings({
                         statuses: DEFAULT_STATUSES.map((s) => ({ ...s })),

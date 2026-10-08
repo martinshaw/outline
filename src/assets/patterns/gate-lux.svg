@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120" fill="none">
+  <!-- White strokes: visible for both luminance and alpha CSS masks. -->
+  <g stroke="#fff" stroke-linecap="round" stroke-linejoin="round">
+    <g stroke-width="1.1">
+      <circle cx="0" cy="0" r="42.426"/>
+      <circle cx="120" cy="0" r="42.426"/>
+      <circle cx="0" cy="120" r="42.426"/>
+      <circle cx="120" cy="120" r="42.426"/>
+      <circle cx="60" cy="60" r="42.426"/>
+    </g>
+    <g stroke-width="0.7" opacity="0.65">
+      <circle cx="0" cy="0" r="28"/>
+      <circle cx="120" cy="0" r="28"/>
+      <circle cx="0" cy="120" r="28"/>
+      <circle cx="120" cy="120" r="28"/>
+      <circle cx="60" cy="60" r="28"/>
+    </g>
+    <g stroke-width="0.85">
+      <path d="M60 13.2l4 4-4 4-4-4z"/>
+      <path d="M60 98.8l4 4-4 4-4-4z"/>
+      <path d="M13.2 60l4 4-4 4-4-4z"/>
+      <path d="M98.8 60l4 4-4 4-4-4z"/>
+    </g>
+    <g stroke-width="0.55" opacity="0.5">
+      <path d="M60 34v14"/>
+      <path d="M60 72v14"/>
+      <path d="M34 60h14"/>
+      <path d="M72 60h14"/>
+    </g>
+  </g>
+</svg>

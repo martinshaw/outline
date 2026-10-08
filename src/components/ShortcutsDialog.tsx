@@ -61,6 +61,10 @@ const SECTIONS: Section[] = [
       { keys: ['⇧', 'Click gutter'], action: 'Extend selection' },
       { keys: [alt, 'Drag'], action: 'Multi-select without gutter' },
       {
+        keys: ['Select text'],
+        action: 'Select those blocks for drag (clears when you type)',
+      },
+      {
         keys: ['Drag selection'],
         action: 'Move selection between items (adopts that level)',
       },
@@ -148,7 +152,7 @@ export function ShortcutsDialog({ open, onClose }: Props) {
           <button
             ref={closeRef}
             type="button"
-            className="shortcuts-dialog__close"
+            className="btn btn--ghost btn--icon"
             aria-label="Close"
             onClick={onClose}
           >

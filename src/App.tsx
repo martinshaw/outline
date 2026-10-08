@@ -383,7 +383,7 @@ export default function App() {
         <div className="topbar__left">
           <button
             type="button"
-            className="topbar__sidebar-btn"
+            className="btn btn--ghost btn--icon-sm"
             onClick={() =>
               setSettings({ sidebarCollapsed: !getSettings().sidebarCollapsed })
             }
