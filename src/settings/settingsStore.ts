@@ -4,6 +4,7 @@ import {
 } from './localFonts';
 import {
   DEFAULT_SETTINGS,
+  DEFAULT_STATUSES,
   FONT_OPTIONS,
   FONT_SIZE_DEFAULT,
   FONT_SIZE_MAX,
@@ -12,6 +13,7 @@ import {
   type AppSettings,
   type BackupMode,
   type FontId,
+  type StatusDef,
   type ThemeId,
 } from './types';
 
@@ -68,6 +70,60 @@ export function clampFontSize(value: number): number {
   return Math.round(clamped * 100) / 100;
 }
 
+function slugStatusId(label: string): string {
+  const base = label
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 40);
+  return base || 'status';
+}
+
+function normalizeColor(value: unknown): string {
+  if (typeof value === 'string' && /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(value)) {
+    return value;
+  }
+  return '#6b7280';
+}
+
+export function normalizeStatuses(raw: unknown): StatusDef[] {
+  if (!Array.isArray(raw)) {
+    return DEFAULT_STATUSES.map((s) => ({ ...s }));
+  }
+  const seen = new Set<string>();
+  const out: StatusDef[] = [];
+  for (const entry of raw) {
+    if (!entry || typeof entry !== 'object') continue;
+    const rec = entry as Partial<StatusDef>;
+    const label = typeof rec.label === 'string' ? rec.label.trim().slice(0, 40) : '';
+    if (!label) continue;
+    let id =
+      typeof rec.id === 'string' && rec.id.trim()
+        ? rec.id.trim().slice(0, 40)
+        : slugStatusId(label);
+    id = id.replace(/[^a-zA-Z0-9_-]/g, '-') || slugStatusId(label);
+    let unique = id;
+    let n = 2;
+    while (seen.has(unique)) {
+      unique = `${id}-${n++}`;
+    }
+    seen.add(unique);
+    out.push({ id: unique, label, color: normalizeColor(rec.color) });
+  }
+  return out.length > 0 ? out : DEFAULT_STATUSES.map((s) => ({ ...s }));
+}
+
+export function getDefaultStatusId(): string {
+  return getSettings().statuses[0]?.id ?? DEFAULT_STATUSES[0].id;
+}
+
+export function getStatusDef(statusId: string | null | undefined): StatusDef {
+  const statuses = getSettings().statuses;
+  const found = statuses.find((s) => s.id === statusId);
+  return found ?? statuses[0] ?? DEFAULT_STATUSES[0];
+}
+
 function normalizeFontSize(value: unknown): number {
   if (typeof value === 'string' && value in LEGACY_FONT_SIZE) {
     return LEGACY_FONT_SIZE[value];
@@ -93,6 +149,9 @@ export function normalizeSettings(
   if (typeof partial.sidebarCollapsed === 'boolean') {
     base.sidebarCollapsed = partial.sidebarCollapsed;
   }
+  if ('statuses' in partial) {
+    base.statuses = normalizeStatuses(partial.statuses);
+  }
   if (isBackupMode(partial.backupMode)) base.backupMode = partial.backupMode;
   if (typeof partial.backupDirectory === 'string') {
     base.backupDirectory = sanitizeBackupDirectory(partial.backupDirectory);
@@ -104,6 +163,9 @@ export function normalizeSettings(
     partial.saveDebounceMs <= 5000
   ) {
     base.saveDebounceMs = Math.round(partial.saveDebounceMs);
+  }
+  if (typeof partial.developerMode === 'boolean') {
+    base.developerMode = partial.developerMode;
   }
   return base;
 }

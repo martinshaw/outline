@@ -46,7 +46,8 @@ const SECTIONS: Section[] = [
       },
       {
         keys: [mod, 'Enter'],
-        action: 'Toggle project (or task under a project)',
+        action:
+          'Promote to project/task, or cycle status on project/task',
       },
       { keys: ['Backspace'], action: 'At start: merge or outdent' },
       { keys: ['Esc'], action: 'Clear block selection' },
@@ -72,6 +73,14 @@ const SECTIONS: Section[] = [
       { keys: [mod, 'B'], action: 'Bold' },
       { keys: [mod, 'I'], action: 'Italic' },
       { keys: [mod, 'U'], action: 'Underline' },
+      {
+        keys: ['#', 'Space'],
+        action: 'Heading 1–6 (`#` … `######` then space)',
+      },
+      {
+        keys: ['Backspace'],
+        action: 'At start of heading: demote to note',
+      },
       { keys: ['Paste URL'], action: 'Insert link' },
       { keys: ['Right-click link'], action: 'Remove link' },
     ],

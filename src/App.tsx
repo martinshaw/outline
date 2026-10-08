@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { OutlineEditor } from './editor/OutlineEditor';
 import { Sidebar } from './sidebar/Sidebar';
 import { DebugOverlay } from './components/DebugOverlay';
@@ -17,18 +17,26 @@ import {
   ensureReadWritePermission,
   loadStoredDirectoryHandle,
   pickNotesDirectory,
+  storeDirectoryHandle,
   supportsDirectoryPicker,
 } from './storage/directory';
 import { notesClient } from './storage/notesClient';
 import {
+  debugLog,
+  isDebugEnabled,
   markSaveError,
   markSaveStart,
   markSaveSuccess,
-} from './storage/saveDebugStore';
+} from './storage/debugStore';
 import type { DayDocument, SidebarDay } from './types';
 import { emptyDayDocument, formatDayLabel, todayKey } from './utils/date';
 import { createDummyHierarchy } from './utils/dummyHierarchy';
-import { buildSidebarFromDocs, extractSidebarDay, isDayEmpty } from './utils/outline';
+import {
+  buildSidebarFromDocs,
+  extractSidebarDay,
+  isDayEmpty,
+  sidebarDaysEqual,
+} from './utils/outline';
 
 type GateState =
   | { status: 'loading' }
@@ -53,13 +61,26 @@ export default function App() {
   );
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [developerMode, setDeveloperMode] = useState(
+    () => getSettings().developerMode,
+  );
   const [docsCache, setDocsCache] = useState<Map<string, DayDocument>>(
     () => new Map(),
   );
+  const docsCacheRef = useRef(docsCache);
+  const activeDateRef = useRef(activeDate);
+  docsCacheRef.current = docsCache;
+  activeDateRef.current = activeDate;
 
   useEffect(() => {
-    const onOnline = () => setOffline(false);
-    const onOffline = () => setOffline(true);
+    const onOnline = () => {
+      setOffline(false);
+      debugLog('info', 'net', 'online');
+    };
+    const onOffline = () => {
+      setOffline(true);
+      debugLog('warn', 'net', 'offline');
+    };
     window.addEventListener('online', onOnline);
     window.addEventListener('offline', onOffline);
     return () => {
@@ -71,6 +92,7 @@ export default function App() {
   useEffect(() => {
     return subscribeSettings((next) => {
       setSidebarCollapsed(next.sidebarCollapsed);
+      setDeveloperMode(next.developerMode);
     });
   }, []);
 
@@ -102,11 +124,15 @@ export default function App() {
   }, []);
 
   const bootstrapFolder = useCallback(async (handle: FileSystemDirectoryHandle) => {
+    const t0 = performance.now();
     const granted = await ensureReadWritePermission(handle);
     if (!granted) {
+      debugLog('warn', 'fs', 'permission denied', handle.name);
       setGate({ status: 'need-permission', handle });
       return;
     }
+    // Keep IndexedDB in sync so “Allow on every visit” restores this folder.
+    await storeDirectoryHandle(handle);
     await notesClient.setRoot(handle);
     const index = await notesClient.loadIndex();
     const cache = new Map<string, DayDocument>();
@@ -119,6 +145,12 @@ export default function App() {
     setActiveDate(today);
     setActiveDoc(todayDoc);
     setGate({ status: 'ready', handle, folderName: handle.name });
+    debugLog(
+      'info',
+      'fs',
+      `workspace ready · ${handle.name}`,
+      `${index.docs.length} days · ${Math.round(performance.now() - t0)}ms`,
+    );
   }, []);
 
   useEffect(() => {
@@ -135,16 +167,15 @@ export default function App() {
           setGate({ status: 'need-folder' });
           return;
         }
-        const perm = await stored.queryPermission({ mode: 'readwrite' });
-        if (perm === 'granted') {
-          await bootstrapFolder(stored);
-        } else {
-          setGate({ status: 'need-permission', handle: stored });
-        }
+        // Always try the last folder first. If the user chose “Allow on every
+        // visit”, permission is already granted and we enter the app. Otherwise
+        // requestPermission may show Chrome’s dialog, or we fall back to the gate.
+        debugLog('info', 'fs', 'restoring last folder', stored.name);
+        await bootstrapFolder(stored);
       } catch (e) {
         console.error(e);
         showErrorToast(e instanceof Error ? e.message : String(e));
-        setGate({ status: 'need-folder' });
+        if (!cancelled) setGate({ status: 'need-folder' });
       }
     })();
     return () => {
@@ -181,11 +212,21 @@ export default function App() {
 
   const mergeSidebar = useCallback(
     (doc: DayDocument, baseSidebar: SidebarDay[]) => {
-      const without = baseSidebar.filter((d) => d.date !== doc.date);
+      const existing = baseSidebar.find((d) => d.date === doc.date);
       if (isDayEmpty(doc)) {
-        return without.sort((a, b) => (a.date < b.date ? 1 : -1));
+        if (!existing) return baseSidebar;
+        return baseSidebar
+          .filter((d) => d.date !== doc.date)
+          .sort((a, b) => (a.date < b.date ? 1 : -1));
       }
-      return [...without, extractSidebarDay(doc)].sort((a, b) =>
+      const nextDay = extractSidebarDay(doc);
+      if (existing && sidebarDaysEqual(existing, nextDay)) {
+        return baseSidebar;
+      }
+      const without = existing
+        ? baseSidebar.filter((d) => d.date !== doc.date)
+        : baseSidebar;
+      return [...without, nextDay].sort((a, b) =>
         a.date < b.date ? 1 : -1,
       );
     },
@@ -195,9 +236,17 @@ export default function App() {
   const handleChange = useCallback(
     (doc: DayDocument) => {
       setDocsCache((prev) => {
+        const empty = isDayEmpty(doc);
+        if (empty && doc.date !== todayKey()) {
+          if (!prev.has(doc.date)) return prev;
+          const next = new Map(prev);
+          next.delete(doc.date);
+          return next;
+        }
+        const prevDoc = prev.get(doc.date);
+        if (prevDoc === doc) return prev;
         const next = new Map(prev);
-        if (isDayEmpty(doc) && doc.date !== todayKey()) next.delete(doc.date);
-        else next.set(doc.date, doc);
+        next.set(doc.date, doc);
         return next;
       });
       setSidebar((prev) => mergeSidebar(doc, prev));
@@ -208,11 +257,12 @@ export default function App() {
   const handleSave = useCallback(
     async (doc: DayDocument) => {
       if (gate.status !== 'ready') return;
-      markSaveStart(doc.date);
+      const debugOn = isDebugEnabled();
+      if (debugOn) markSaveStart(doc.date);
       try {
         const result = await notesClient.saveDay(doc);
-        markSaveSuccess(doc.date, result.status);
-        setSidebar(result.sidebar);
+        if (debugOn) markSaveSuccess(doc.date, result.status);
+        setSidebar((prev) => mergeSidebar(doc, prev));
         setDocsCache((prev) => {
           const next = new Map(prev);
           if (result.status === 'deleted') next.delete(doc.date);
@@ -222,55 +272,79 @@ export default function App() {
       } catch (e) {
         console.error('Save failed', e);
         const msg = e instanceof Error ? e.message : String(e);
-        markSaveError(doc.date, msg);
+        if (debugOn) markSaveError(doc.date, msg);
         showErrorToast(msg);
       }
     },
-    [gate],
+    [gate, mergeSidebar],
   );
 
-  const selectDay = async (date: string) => {
-    if (date === activeDate) return;
+  const selectDay = useCallback(async (date: string) => {
+    if (date === activeDateRef.current) return;
     // Flush current via cache; disk already debounced
-    const cached = docsCache.get(date);
+    const cached = docsCacheRef.current.get(date);
     if (cached) {
+      debugLog('info', 'nav', `day ${date}`, 'from cache');
       setActiveDate(date);
       setActiveDoc(cached);
       return;
     }
     try {
+      const t0 = performance.now();
       const fromDisk = await notesClient.loadDay(date);
       const doc = fromDisk ?? emptyDayDocument(date);
       setDocsCache((prev) => new Map(prev).set(date, doc));
       setActiveDate(date);
       setActiveDoc(doc);
+      debugLog(
+        'info',
+        'nav',
+        `day ${date}`,
+        `${fromDisk ? 'from disk' : 'empty'} · ${Math.round(performance.now() - t0)}ms`,
+      );
     } catch (e) {
-      showErrorToast(e instanceof Error ? e.message : String(e));
+      const msg = e instanceof Error ? e.message : String(e);
+      debugLog('error', 'nav', `day ${date} failed`, msg);
+      showErrorToast(msg);
     }
-  };
+  }, []);
 
-  const selectItem = async (date: string, itemId: string) => {
-    if (date !== activeDate) {
-      await selectDay(date);
-    }
-    setFocusItemId(itemId);
-  };
+  const selectItem = useCallback(
+    async (date: string, itemId: string) => {
+      if (date !== activeDateRef.current) {
+        await selectDay(date);
+      }
+      setFocusItemId(itemId);
+      debugLog('debug', 'nav', 'focus item', itemId.slice(0, 8));
+    },
+    [selectDay],
+  );
 
-  const insertDummyHierarchy = () => {
-    const doc = createDummyHierarchy(activeDate);
+  const insertDummyHierarchy = useCallback(() => {
+    const date = activeDateRef.current;
+    const doc = createDummyHierarchy(date);
     setActiveDoc(doc);
-    setDocsCache((prev) => new Map(prev).set(activeDate, doc));
+    setDocsCache((prev) => new Map(prev).set(date, doc));
     setSidebar((prev) => mergeSidebar(doc, prev));
     setEditorNonce((n) => n + 1);
+    debugLog('info', 'dev', 'inserted test hierarchy', doc.date);
     void handleSave(doc);
-  };
+  }, [handleSave, mergeSidebar]);
 
-  // Ensure today appears selectable even if empty (in editor only; sidebar omits empty)
+  const openShortcuts = useCallback(() => setShortcutsOpen(true), []);
+  const openSettings = useCallback(() => setSettingsOpen(true), []);
+  const onExportMessage = useCallback((msg: string | null) => {
+    if (msg) showErrorToast(msg);
+  }, []);
+  const onFocusHandled = useCallback(() => setFocusItemId(null), []);
+
+  // Prefer live sidebar; if empty, derive from cache once.
   const displaySidebar = useMemo(() => {
-    // Prefer live sidebar; if cache has more days rebuild
     if (sidebar.length > 0) return sidebar;
     return buildSidebarFromDocs([...docsCache.values()]);
   }, [sidebar, docsCache]);
+
+  const liveDoc = docsCache.get(activeDate) ?? activeDoc;
 
   if (gate.status === 'loading') {
     return (
@@ -328,14 +402,12 @@ export default function App() {
           <TopMenu
             folderName={gate.folderName}
             offline={offline}
-            activeDoc={activeDoc}
+            activeDoc={liveDoc}
             onInsertTestHierarchy={insertDummyHierarchy}
             onChangeFolder={openFolder}
-            onOpenShortcuts={() => setShortcutsOpen(true)}
-            onOpenSettings={() => setSettingsOpen(true)}
-            onExportMessage={(msg) => {
-              if (msg) showErrorToast(msg);
-            }}
+            onOpenShortcuts={openShortcuts}
+            onOpenSettings={openSettings}
+            onExportMessage={onExportMessage}
           />
         </div>
       </header>
@@ -344,8 +416,8 @@ export default function App() {
           days={displaySidebar}
           activeDate={activeDate}
           collapsed={sidebarCollapsed}
-          onSelectDay={(d) => void selectDay(d)}
-          onSelectItem={(d, id) => void selectItem(d, id)}
+          onSelectDay={selectDay}
+          onSelectItem={selectItem}
         />
         <main className="main">
           <h1 className="main__day">{formatDayLabel(activeDate)}</h1>
@@ -355,21 +427,24 @@ export default function App() {
             document={activeDoc}
             enabled
             focusItemId={focusItemId}
-            onFocusHandled={() => setFocusItemId(null)}
+            onFocusHandled={onFocusHandled}
             onSave={handleSave}
             onChange={handleChange}
           />
         </main>
       </div>
-      <DebugOverlay
-        activeDate={activeDate}
-        activeDoc={activeDoc}
-        focusItemId={focusItemId}
-        folderName={gate.folderName}
-        offline={offline}
-        editorNonce={editorNonce}
-        sidebarDayCount={displaySidebar.length}
-      />
+      {developerMode && (
+        <DebugOverlay
+          activeDate={activeDate}
+          activeDoc={liveDoc}
+          focusItemId={focusItemId}
+          folderName={gate.folderName}
+          offline={offline}
+          editorNonce={editorNonce}
+          sidebarDayCount={displaySidebar.length}
+          docsCacheSize={docsCache.size}
+        />
+      )}
       <ToastHost />
       <ShortcutsDialog
         open={shortcutsOpen}

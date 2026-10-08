@@ -20,6 +20,7 @@ function item(
   return {
     id: createId(),
     kind,
+    status: kind === 'project' || kind === 'task' ? 'todo' : null,
     content: text(title, format),
     children,
   };

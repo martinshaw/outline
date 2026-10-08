@@ -26,10 +26,12 @@ export async function clearDirectoryHandle(): Promise<void> {
 }
 
 export async function pickNotesDirectory(): Promise<FileSystemDirectoryHandle> {
+  const previous = await loadStoredDirectoryHandle();
   const handle = await window.showDirectoryPicker({
     id: 'outline-notes',
     mode: 'readwrite',
-    startIn: 'documents',
+    // Prefer the last opened folder when the browser supports it.
+    startIn: previous ?? 'documents',
   });
   await storeDirectoryHandle(handle);
   return handle;

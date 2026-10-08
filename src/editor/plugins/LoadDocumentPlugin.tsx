@@ -11,6 +11,8 @@ type Props = {
 export function LoadDocumentPlugin({ document }: Props): null {
   const [editor] = useLexicalComposerContext();
   const loaded = useRef(false);
+  const docRef = useRef(document);
+  docRef.current = document;
 
   useEffect(() => {
     loaded.current = false;
@@ -21,11 +23,11 @@ export function LoadDocumentPlugin({ document }: Props): null {
     loaded.current = true;
     editor.update(
       () => {
-        $loadDayDocument(document);
+        $loadDayDocument(docRef.current);
       },
       { tag: 'load' },
     );
-  }, [editor, document]);
+  }, [editor, document.date]);
 
   return null;
 }

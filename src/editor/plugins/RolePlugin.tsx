@@ -6,6 +6,10 @@ import {
   KEY_ENTER_COMMAND,
 } from 'lexical';
 import { mergeRegister } from '@lexical/utils';
+import {
+  getDefaultStatusId,
+  getSettings,
+} from '../../settings/settingsStore';
 import type { OutlineItemNode } from '../nodes/OutlineItemNode';
 import {
   $getMoveTargets,
@@ -13,34 +17,53 @@ import {
   $getSelectedOutlineItem,
 } from '../utils/outlineHelpers';
 
-function $toggleItemRole(item: OutlineItemNode): void {
-  const underProject = $getNearestProjectParent(item) !== null;
+function $cycleStatus(item: OutlineItemNode): void {
+  const statuses = getSettings().statuses;
+  if (statuses.length === 0) return;
+  const current = item.getStatus() ?? statuses[0].id;
+  const idx = statuses.findIndex((s) => s.id === current);
+  const next = statuses[(idx >= 0 ? idx + 1 : 0) % statuses.length];
+  item.setStatus(next.id);
+}
+
+function $promoteOrCycle(item: OutlineItemNode): void {
   const kind = item.getKind();
 
+  if (kind === 'project' || kind === 'task') {
+    $cycleStatus(item);
+    return;
+  }
+
+  // Note / heading → project (or task when nested under a project)
+  const underProject = $getNearestProjectParent(item) !== null;
+  const status = getDefaultStatusId();
   if (underProject) {
-    item.setKind(kind === 'task' ? 'note' : 'task');
-  } else if (kind === 'project') {
-    item.setKind('note');
+    item.setHeading(null);
+    item.setKind('task');
+    item.setStatus(status);
   } else {
+    item.setHeading(null);
     item.setKind('project');
+    item.setStatus(status);
   }
 }
 
 function $toggleRole(): boolean {
   const targets = $getMoveTargets();
   if (targets.length > 0) {
-    for (const item of targets) $toggleItemRole(item);
+    for (const item of targets) $promoteOrCycle(item);
     return true;
   }
   const item = $getSelectedOutlineItem();
   if (!item) return false;
-  $toggleItemRole(item);
+  $promoteOrCycle(item);
   return true;
 }
 
 /**
- * ⌘/Ctrl+Enter toggles project/task and must not create a new sibling.
- * Capture-phase keydown stops Enter before Lexical's insert-paragraph path.
+ * ⌘/Ctrl+Enter promotes a note to project/task, or cycles status on
+ * project/task items. Capture-phase keydown stops Enter before Lexical's
+ * insert-paragraph path.
  */
 export function RolePlugin(): null {
   const [editor] = useLexicalComposerContext();
@@ -73,7 +96,6 @@ export function RolePlugin(): null {
             return false;
           }
           event?.preventDefault();
-          // Already handled in capture keydown; just swallow
           return true;
         },
         COMMAND_PRIORITY_CRITICAL,

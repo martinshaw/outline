@@ -67,21 +67,15 @@ class NotesClient {
 
   async saveDay(doc: DayDocument): Promise<{
     status: 'saved' | 'deleted';
-    sidebar: SidebarDay[];
-    days: string[];
   }> {
+    // Do not reload the whole workspace after each save — callers merge the
+    // sidebar from the in-memory cache / saved doc.
     const status = await fsSaveDay(this.requireRoot(), doc);
-    const index = await this.loadIndex();
-    return { status, sidebar: index.sidebar, days: index.days };
+    return { status };
   }
 
-  async deleteDay(date: string): Promise<{
-    sidebar: SidebarDay[];
-    days: string[];
-  }> {
+  async deleteDay(date: string): Promise<void> {
     await fsDeleteDay(this.requireRoot(), date);
-    const index = await this.loadIndex();
-    return { sidebar: index.sidebar, days: index.days };
   }
 
   async parseSidebar(docs: DayDocument[]): Promise<SidebarDay[]> {

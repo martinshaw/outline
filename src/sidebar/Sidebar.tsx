@@ -1,14 +1,15 @@
+import { memo } from 'react';
 import type { SidebarDay } from '../types';
 
 type Props = {
   days: SidebarDay[];
   activeDate: string;
   collapsed: boolean;
-  onSelectDay: (date: string) => void;
-  onSelectItem: (date: string, itemId: string) => void;
+  onSelectDay: (date: string) => void | Promise<void>;
+  onSelectItem: (date: string, itemId: string) => void | Promise<void>;
 };
 
-export function Sidebar({
+export const Sidebar = memo(function Sidebar({
   days,
   activeDate,
   collapsed,
@@ -79,4 +80,4 @@ export function Sidebar({
       )}
     </aside>
   );
-}
+});

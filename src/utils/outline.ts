@@ -30,7 +30,7 @@ export function isDayEmpty(doc: DayDocument): boolean {
 export function extractSidebarDay(doc: DayDocument): SidebarDay {
   const projects: SidebarProject[] = [];
 
-  const visit = (items: OutlineItem[], underProject: OutlineItem | null) => {
+  const visit = (items: OutlineItem[]) => {
     for (const item of items) {
       if (item.kind === 'project') {
         const tasks: { id: string; title: string }[] = [];
@@ -48,20 +48,39 @@ export function extractSidebarDay(doc: DayDocument): SidebarDay {
           title: itemTitle(item),
           tasks,
         });
-        visit(item.children, item);
-      } else {
-        visit(item.children, underProject);
       }
+      visit(item.children);
     }
   };
 
-  visit(doc.items, null);
+  visit(doc.items);
 
   return {
     date: doc.date,
     label: formatDayLabel(doc.date),
     projects,
   };
+}
+
+/** True when sidebar projection for a day is unchanged (skip React updates). */
+export function sidebarDaysEqual(a: SidebarDay, b: SidebarDay): boolean {
+  if (a.date !== b.date || a.label !== b.label) return false;
+  if (a.projects.length !== b.projects.length) return false;
+  for (let i = 0; i < a.projects.length; i++) {
+    const pa = a.projects[i];
+    const pb = b.projects[i];
+    if (pa.id !== pb.id || pa.title !== pb.title) return false;
+    if (pa.tasks.length !== pb.tasks.length) return false;
+    for (let j = 0; j < pa.tasks.length; j++) {
+      if (
+        pa.tasks[j].id !== pb.tasks[j].id ||
+        pa.tasks[j].title !== pb.tasks[j].title
+      ) {
+        return false;
+      }
+    }
+  }
+  return true;
 }
 
 export function buildSidebarFromDocs(docs: DayDocument[]): SidebarDay[] {
