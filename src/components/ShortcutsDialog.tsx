@@ -93,9 +93,9 @@ const SECTIONS: Section[] = [
   {
     title: 'App',
     shortcuts: [
+      { keys: [mod, 'P'], action: 'Command palette (settings, exports, folder…)' },
       { keys: ['?'], action: 'Open keyboard shortcuts' },
       { keys: [mod, '/'], action: 'Open keyboard shortcuts' },
-      { keys: ['Menu'], action: 'Settings, exports, folder…' },
       { keys: ['Esc'], action: 'Close dialog / clear selection' },
     ],
   },

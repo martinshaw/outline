@@ -23,6 +23,7 @@ function isUiChromeTarget(target: EventTarget | null): boolean {
         '.top-menu',
         '.settings-overlay',
         '.shortcuts-overlay',
+        '.command-palette-overlay',
         '.debug-overlay',
         '.toast-host',
         '.gate',
@@ -75,7 +76,7 @@ export function EditorFocusPlugin(): null {
       if (target instanceof Element) {
         if (
           target.closest(
-            'input, textarea, select, [role="dialog"], .settings-overlay, .shortcuts-overlay',
+            'input, textarea, select, [role="dialog"], .settings-overlay, .shortcuts-overlay, .command-palette-overlay',
           )
         ) {
           return;
