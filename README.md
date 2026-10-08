@@ -1,6 +1,6 @@
 # Outline
 
-**Version 0.8.0** · [Live demo](https://martinshaw.github.io/outline/) · [Repository](https://github.com/martinshaw/outline)
+**Version 0.8.1** · [Live demo](https://martinshaw.github.io/outline/) · [Repository](https://github.com/martinshaw/outline)
 
 Local-first chronological outline editor inspired by [LogSeq](https://logseq.com). Notes live in a folder on your computer via Chrome’s File System Access API — no account, no server, no sync backend.
 
@@ -20,7 +20,7 @@ Built with [React](https://react.dev), [Lexical](https://lexical.dev), [Vite](ht
    - [Outliner behavior](#outliner-behavior)
    - [Links](#links)
    - [Block selection](#block-selection)
-   - [Menu](#menu)
+   - [Command palette](#command-palette)
    - [Settings](#settings)
 5. [Keyboard shortcuts](#keyboard-shortcuts)
 6. [Storage layout](#storage-layout)
@@ -180,23 +180,24 @@ With a **block selection**, Tab, Shift+Tab, and move shortcuts apply to the whol
 
 Selected blocks include nested children for move/indent where applicable. Selection is used for **Export selection**. UI chrome (sidebar, menus, chips) is non-selectable so `⌘A` / `Ctrl+A` targets the outline.
 
-### Menu
+### Command palette
 
-Open **Menu** in the top bar:
+Open with **`⌘P` / `Ctrl+P`**. Type to filter; `↑` `↓` and `Enter` to run.
 
-| Item | Purpose |
-|------|---------|
+| Command | Purpose |
+|---------|---------|
 | **Change folder** | Pick a different notes directory |
 | **Insert test hierarchy** | Sample nested outline for the active day |
 | **Keyboard shortcuts** | Same as `?` or `⌘/` / `Ctrl+/` |
-| **Settings…** | Font, theme, statuses, backups, autosave |
+| **Settings** | Font, theme, statuses, backups, autosave |
+| **Show / Hide developer panel** | Toggle the bottom-right debug UI |
 | **Export day / selection** | JSON, YAML, Markdown, Text, or HTML |
 
 Errors (save failures, empty selection export, etc.) show as toasts.
 
 ### Settings
 
-Open **Menu → Settings…**. Preferences are saved as **`settings.json`** in the root of your workspace folder (next to `notes/`), so they travel with your files — not in the browser.
+Open **Settings** from the command palette. Preferences are saved as **`settings.json`** in the root of your workspace folder (next to `notes/`), so they travel with your files — not in the browser.
 
 | Section | Options |
 |---------|---------|
@@ -269,9 +270,9 @@ Press `?` or `⌘/` / `Ctrl+/` in the app for the same list.
 
 | Shortcut | Action |
 |----------|--------|
+| `⌘P` / `Ctrl+P` | Command palette (settings, exports, folder…) |
 | `?` | Open keyboard shortcuts |
 | `⌘/` / `Ctrl+/` | Open keyboard shortcuts |
-| Menu | Settings, exports, folder… |
 | `Esc` | Close dialog / clear selection |
 
 ---
@@ -386,7 +387,7 @@ Until a folder is opened, the app uses in-memory defaults. Opening a folder load
 
 ## Exports
 
-From **Menu**, export the **whole day** or the **current block selection**:
+From the **command palette**, export the **whole day** or the **current block selection**:
 
 | Format | Extension | Notes |
 |--------|-----------|--------|
@@ -405,6 +406,7 @@ Selection export requires at least one block selected.
 - After a production visit, the service worker caches the app shell so the UI can load offline.
 - **Notes still require** access to your chosen folder. Offline editing works once permission is granted and the handle is available.
 - Returning later, Chrome may ask you to re-confirm folder access — use the gate screen or **Change folder**.
+- When a new deploy is ready, an **Update available** banner appears. Outline **auto-reloads after ~2s idle** (save finished, no typing, no dialogs open). **Reload now** applies as soon as the current save finishes; **Later** defers until the next update. Focus/visibility also re-checks for updates on long-lived tabs.
 
 ### Install on phone or desktop
 

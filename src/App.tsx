@@ -3,11 +3,14 @@ import { OutlineEditor } from './editor/OutlineEditor';
 import { Sidebar } from './sidebar/Sidebar';
 import { DebugOverlay } from './components/DebugOverlay';
 import { FolderGate } from './components/FolderGate';
+import { CommandPalette } from './components/CommandPalette';
+import { CommandPaletteTrigger } from './components/CommandPaletteTrigger';
 import { SettingsDialog } from './components/SettingsDialog';
 import { ShortcutsDialog } from './components/ShortcutsDialog';
 import { ToastHost } from './components/ToastHost';
-import { TopMenu } from './components/TopMenu';
+import { UpdateBanner } from './components/UpdateBanner';
 import { showErrorToast } from './components/toastStore';
+import { setPwaUiBlocking } from './pwa/updateStore';
 import {
   getSettings,
   setSettings,
@@ -61,6 +64,7 @@ export default function App() {
   );
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
   const [developerMode, setDeveloperMode] = useState(
     () => getSettings().developerMode,
   );
@@ -121,6 +125,10 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    setPwaUiBlocking(paletteOpen || settingsOpen || shortcutsOpen);
+  }, [paletteOpen, settingsOpen, shortcutsOpen]);
+
+  useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
       const typing =
@@ -128,6 +136,18 @@ export default function App() {
         (target.tagName === 'INPUT' ||
           target.tagName === 'TEXTAREA' ||
           target.isContentEditable);
+
+      if (
+        (event.key === 'p' || event.key === 'P') &&
+        (event.metaKey || event.ctrlKey) &&
+        !event.altKey &&
+        !event.shiftKey
+      ) {
+        event.preventDefault();
+        setPaletteOpen((open) => !open);
+        return;
+      }
+
       if (event.key === '?' && !event.metaKey && !event.ctrlKey && !event.altKey) {
         if (typing) return;
         event.preventDefault();
@@ -408,6 +428,7 @@ export default function App() {
           onOpenFolder={openFolder}
           onGrantPermission={grantPermission}
         />
+        <UpdateBanner />
         <ToastHost />
       </>
     );
@@ -439,16 +460,7 @@ export default function App() {
         </div>
         <div className="topbar__meta">
           {offline && <span className="topbar__offline">Offline</span>}
-          <TopMenu
-            folderName={gate.folderName}
-            offline={offline}
-            activeDoc={liveDoc}
-            onInsertTestHierarchy={insertDummyHierarchy}
-            onChangeFolder={openFolder}
-            onOpenShortcuts={openShortcuts}
-            onOpenSettings={openSettings}
-            onExportMessage={onExportMessage}
-          />
+          <CommandPaletteTrigger onOpen={() => setPaletteOpen(true)} />
         </div>
       </header>
       <div className="app__body">
@@ -493,7 +505,20 @@ export default function App() {
           docsCacheSize={docsCache.size}
         />
       )}
+      <UpdateBanner />
       <ToastHost />
+      <CommandPalette
+        open={paletteOpen}
+        onClose={() => setPaletteOpen(false)}
+        folderName={gate.folderName}
+        offline={offline}
+        activeDoc={liveDoc}
+        onInsertTestHierarchy={insertDummyHierarchy}
+        onChangeFolder={openFolder}
+        onOpenShortcuts={openShortcuts}
+        onOpenSettings={openSettings}
+        onExportMessage={onExportMessage}
+      />
       <ShortcutsDialog
         open={shortcutsOpen}
         onClose={() => setShortcutsOpen(false)}

@@ -1,5 +1,9 @@
 import { useEffect, useRef } from 'react';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
+import {
+  setPwaSaveBusy,
+  touchPwaEditorActivity,
+} from '../../pwa/updateStore';
 import { getSettings } from '../../settings/settingsStore';
 import {
   debugLog,
@@ -47,6 +51,7 @@ export function PersistencePlugin({
     let lastSerializeMs = 0;
     let lastDirtyE = 0;
     let lastDirtyL = 0;
+    let saveGen = 0;
 
     const serialize = (): DayDocument => {
       const debugOn = isDebugEnabled();
@@ -99,12 +104,16 @@ export function PersistencePlugin({
         coalescedUpdates += 1;
       }
 
+      touchPwaEditorActivity();
+      setPwaSaveBusy(true);
       scheduleChange();
       if (debugOn) markSavePending(dateRef.current);
 
       if (saveTimer.current) clearTimeout(saveTimer.current);
       const delay = getSettings().saveDebounceMs;
+      const gen = ++saveGen;
       saveTimer.current = setTimeout(() => {
+        saveTimer.current = null;
         // Coalesce with any pending rAF so we serialize once for change + save.
         if (changeRaf.current != null) {
           cancelAnimationFrame(changeRaf.current);
@@ -133,7 +142,9 @@ export function PersistencePlugin({
           markSaveStart(doc.date);
         }
         onChangeRef.current?.(doc);
-        void onSaveRef.current(doc);
+        void Promise.resolve(onSaveRef.current(doc)).finally(() => {
+          if (gen === saveGen) setPwaSaveBusy(false);
+        });
       }, delay);
     });
   }, [editor, enabled]);
@@ -142,6 +153,7 @@ export function PersistencePlugin({
     return () => {
       if (saveTimer.current) clearTimeout(saveTimer.current);
       if (changeRaf.current != null) cancelAnimationFrame(changeRaf.current);
+      setPwaSaveBusy(false);
     };
   }, []);
 

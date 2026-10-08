@@ -11,7 +11,8 @@ export default defineConfig(({ mode }) => {
     plugins: [
       react(),
       VitePWA({
-        registerType: 'autoUpdate',
+        // Prompt so we can show an in-app "update available" banner.
+        registerType: 'prompt',
         includeAssets: ['favicon.svg', 'icon.svg', 'apple-touch-icon.svg'],
         manifest: {
           id: pagesBase,
