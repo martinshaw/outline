@@ -647,7 +647,8 @@ button {
   --outline-nest: 1.25rem;
   min-width: 0;
   overflow: auto;
-  padding: 1.25rem 1.5rem 3rem;
+  /* Right pad mirrors date inset (outer pad + --outline-label) */
+  padding: 1.25rem calc(1.5rem + var(--outline-label)) 3rem 1.5rem;
 }
 
 .main__day {
@@ -728,7 +729,8 @@ button {
 
 .editor-shell {
   position: relative;
-  max-width: 46rem;
+  width: 100%;
+  max-width: none;
 }
 
 .editor-input {
@@ -940,9 +942,45 @@ button {
   background: color-mix(in srgb, var(--accent-soft) 70%, transparent);
 }
 
+/*
+ * Selection chrome: pull the highlight left so bullets sit inside it with
+ * a little horizontal padding (content position stays put).
+ */
 .outline-item--selected {
+  --outline-sel-pad: 0.45rem;
+  margin-left: calc(-1 * var(--outline-sel-pad));
+  padding-left: calc(var(--outline-pad) + var(--outline-sel-pad));
   background: color-mix(in srgb, var(--accent-soft) 70%, transparent);
-  border-radius: 2px;
+  border-radius: 4px;
+}
+
+.outline-item .outline-item.outline-item--selected {
+  margin-left: calc(var(--outline-nest) - var(--outline-sel-pad));
+}
+
+.outline-item--selected:has(> .outline-status-chip) {
+  padding-left: calc(
+    var(--outline-pad) + var(--outline-sel-pad) +
+      var(--outline-chip-indent, 3.25em) + var(--outline-gap)
+  );
+}
+
+/* Keep bullet / label / chip aligned with text after the left extend */
+.outline-item--selected::before {
+  left: calc(var(--outline-bullet-x) + var(--outline-sel-pad));
+}
+
+.outline-item--selected[data-kind-label]::after {
+  left: var(--outline-sel-pad);
+}
+
+.outline-item .outline-item.outline-item--selected[data-kind-label]::after {
+  left: auto;
+  right: calc(100% - var(--outline-bullet-x) - var(--outline-sel-pad));
+}
+
+.outline-item--selected > .outline-status-chip {
+  left: calc(var(--outline-chip-x) + var(--outline-sel-pad));
 }
 
 /* Selected parent visually includes descendants */
@@ -952,6 +990,63 @@ button {
 
 .outline-item--selected .outline-item--selected {
   background: color-mix(in srgb, var(--accent-soft) 70%, transparent);
+}
+
+/* Drag handles live in an overlay — never inside contenteditable item DOM */
+.outline-block-handle-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.outline-block-handle {
+  position: absolute;
+  transform: translateY(-50%);
+  z-index: 6;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.15rem;
+  height: 1.35rem;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 3px;
+  background: var(--ink);
+  color: var(--paper);
+  cursor: grab;
+  pointer-events: auto;
+  user-select: none;
+  -webkit-user-select: none;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--paper) 35%, transparent);
+}
+
+.outline-block-handle:hover {
+  background: var(--accent);
+  color: var(--paper);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 80%, var(--paper));
+}
+
+.outline-block-handle:active,
+.editor-input.block-moving ~ .outline-block-handle-layer .outline-block-handle,
+.editor-shell:has(.editor-input.block-moving) .outline-block-handle {
+  cursor: grabbing;
+}
+
+.outline-block-handle__grip {
+  display: block;
+  width: 0.55rem;
+  height: 0.85rem;
+  background-image: radial-gradient(
+    circle,
+    currentColor 1.1px,
+    transparent 1.25px
+  );
+  background-size: 50% 33.33%;
+  background-position: 0 0;
+  opacity: 0.95;
 }
 
 /*
@@ -1075,9 +1170,9 @@ button {
   }
 
   .main {
-    padding: 0.85rem 0.9rem 2.5rem;
-    padding-left: max(0.9rem, env(safe-area-inset-left));
-    padding-right: max(0.9rem, env(safe-area-inset-right));
+    padding: 0.85rem
+      calc(max(0.9rem, env(safe-area-inset-right)) + var(--outline-label))
+      2.5rem max(0.9rem, env(safe-area-inset-left));
   }
 
   .main__day {

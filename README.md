@@ -1,6 +1,6 @@
 # Outline
 
-**Version 0.7.0** · [Live demo](https://martinshaw.github.io/outline/) · [Repository](https://github.com/martinshaw/outline)
+**Version 0.8.0** · [Live demo](https://martinshaw.github.io/outline/) · [Repository](https://github.com/martinshaw/outline)
 
 Local-first chronological outline editor inspired by [LogSeq](https://logseq.com). Notes live in a folder on your computer via Chrome’s File System Access API — no account, no server, no sync backend.
 

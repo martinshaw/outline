@@ -201,6 +201,211 @@ function $isDescendantOf(
   return false;
 }
 
+/** Nesting depth under the document root (0 = top-level outline item). */
+export function $getOutlineDepth(item: OutlineItemNode): number {
+  let depth = 0;
+  let parent = $getParentOutlineItem(item);
+  while (parent) {
+    depth += 1;
+    parent = $getParentOutlineItem(parent);
+  }
+  return depth;
+}
+
+/**
+ * True when every selected item deeper than the shallowest selected level is a
+ * descendant of at least one selected item at that shallowest level.
+ */
+export function $isHierarchicallyValidBlockSelection(
+  items: OutlineItemNode[],
+): boolean {
+  if (items.length <= 1) return true;
+  const depths = items.map($getOutlineDepth);
+  return $isValidRangeByDepth(items, depths, 0, items.length - 1);
+}
+
+/** Index-based check — avoids allocating slices on the hot clamp path. */
+function $isValidRangeByDepth(
+  ordered: OutlineItemNode[],
+  depths: number[],
+  lo: number,
+  hi: number,
+): boolean {
+  if (hi <= lo) return true;
+
+  let minDepth = depths[lo];
+  for (let i = lo + 1; i <= hi; i++) {
+    if (depths[i] < minDepth) minDepth = depths[i];
+  }
+
+  const rootKeys = new Set<string>();
+  for (let i = lo; i <= hi; i++) {
+    if (depths[i] === minDepth) rootKeys.add(ordered[i].getKey());
+  }
+
+  for (let i = lo; i <= hi; i++) {
+    if (depths[i] === minDepth) continue;
+    let p = $getParentOutlineItem(ordered[i]);
+    let ok = false;
+    while (p) {
+      if (rootKeys.has(p.getKey())) {
+        ok = true;
+        break;
+      }
+      p = $getParentOutlineItem(p);
+    }
+    if (!ok) return false;
+  }
+  return true;
+}
+
+/**
+ * Pull in ancestors of orphan deep items until the contiguous DFS span
+ * covering the set is hierarchically valid.
+ */
+function $expandBlockSelectionWithAncestors(
+  ordered: OutlineItemNode[],
+  depths: number[],
+  lo: number,
+  hi: number,
+): string[] {
+  const selected = new Set<string>();
+  for (let i = lo; i <= hi; i++) selected.add(ordered[i].getId());
+  if (selected.size === 0) return [];
+
+  const idToIndex = new Map<string, number>();
+  for (let i = 0; i < ordered.length; i++) {
+    idToIndex.set(ordered[i].getId(), i);
+  }
+
+  for (let guard = 0; guard < ordered.length; guard++) {
+    const indices: number[] = [];
+    for (let i = 0; i < ordered.length; i++) {
+      if (selected.has(ordered[i].getId())) indices.push(i);
+    }
+    if (indices.length === 0) return [];
+
+    let spanLo = indices[0];
+    let spanHi = indices[0];
+    for (const i of indices) {
+      if (i < spanLo) spanLo = i;
+      if (i > spanHi) spanHi = i;
+    }
+    if ($isValidRangeByDepth(ordered, depths, spanLo, spanHi)) {
+      const out: string[] = [];
+      for (let i = spanLo; i <= spanHi; i++) out.push(ordered[i].getId());
+      return out;
+    }
+
+    let minDepth = depths[indices[0]];
+    for (const i of indices) {
+      if (depths[i] < minDepth) minDepth = depths[i];
+    }
+    const rootKeys = new Set<string>();
+    for (const i of indices) {
+      if (depths[i] === minDepth) rootKeys.add(ordered[i].getKey());
+    }
+
+    let added = false;
+    for (const i of indices) {
+      if (depths[i] === minDepth) continue;
+      let p = $getParentOutlineItem(ordered[i]);
+      let underRoot = false;
+      while (p) {
+        if (rootKeys.has(p.getKey())) {
+          underRoot = true;
+          break;
+        }
+        p = $getParentOutlineItem(p);
+      }
+      if (underRoot) continue;
+      const parent = $getParentOutlineItem(ordered[i]);
+      if (parent && !selected.has(parent.getId())) {
+        selected.add(parent.getId());
+        added = true;
+      }
+    }
+    if (!added) break;
+  }
+
+  // Fallback: contiguous span of whatever we collected.
+  let spanLo = ordered.length;
+  let spanHi = -1;
+  for (const id of selected) {
+    const idx = idToIndex.get(id);
+    if (idx == null) continue;
+    if (idx < spanLo) spanLo = idx;
+    if (idx > spanHi) spanHi = idx;
+  }
+  if (spanHi < spanLo) return [];
+  const out: string[] = [];
+  for (let i = spanLo; i <= spanHi; i++) out.push(ordered[i].getId());
+  return out;
+}
+
+/** Dropping on a parent (has kids) or a shallower node may pull in ancestors. */
+function $isBlockSelectionExpandTarget(
+  to: OutlineItemNode,
+  fromDepth: number,
+  toDepth: number,
+): boolean {
+  if ($getNestedItems(to).length > 0) return true;
+  return toDepth < fromDepth;
+}
+
+/**
+ * Build a block selection from `fromId` toward `toId`.
+ * - Valid DFS ranges are kept as-is (e.g. Morning notes → Auth subtree).
+ * - Hovering foreign deep items is fine when the endpoint is a parent / shallower
+ *   node: missing ancestors are pulled in so the span becomes valid.
+ * - Otherwise use the farthest still-valid endpoint (validity need not be
+ *   monotonic along the path).
+ */
+export function $clampBlockSelectionRange(
+  ordered: OutlineItemNode[],
+  fromId: string,
+  toId: string,
+): string[] {
+  const n = ordered.length;
+  const ids: string[] = new Array(n);
+  const depths: number[] = new Array(n);
+  let a = -1;
+  let b = -1;
+  for (let i = 0; i < n; i++) {
+    const id = ordered[i].getId();
+    ids[i] = id;
+    depths[i] = $getOutlineDepth(ordered[i]);
+    if (id === fromId) a = i;
+    if (id === toId) b = i;
+  }
+
+  if (a < 0 && b < 0) return [];
+  if (a < 0) return [toId];
+  if (b < 0 || a === b) return [fromId];
+
+  const lo = Math.min(a, b);
+  const hi = Math.max(a, b);
+  if ($isValidRangeByDepth(ordered, depths, lo, hi)) {
+    return ids.slice(lo, hi + 1);
+  }
+
+  if ($isBlockSelectionExpandTarget(ordered[b], depths[a], depths[b])) {
+    const expanded = $expandBlockSelectionWithAncestors(ordered, depths, lo, hi);
+    if (expanded.length > 0) return expanded;
+  }
+
+  // Farthest valid endpoint — validity is not monotonic, so scan fully.
+  const step = a < b ? 1 : -1;
+  let best = a;
+  for (let i = a + step; step > 0 ? i <= b : i >= b; i += step) {
+    if ($isValidRangeByDepth(ordered, depths, Math.min(a, i), Math.max(a, i))) {
+      best = i;
+    }
+  }
+
+  return ids.slice(Math.min(a, best), Math.max(a, best) + 1);
+}
+
 function $insertAllBefore(ref: OutlineItemNode, nodes: OutlineItemNode[]): void {
   for (let i = nodes.length - 1; i >= 0; i--) {
     ref.insertBefore(nodes[i]);

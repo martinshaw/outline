@@ -12,18 +12,21 @@ import {
 import { mergeRegister } from '@lexical/utils';
 import {
   clearBlockSelectedIds,
+  disposeBlockDragHandles,
   getBlockSelectedIds,
+  refreshBlockSelectionChrome,
   setBlockSelectedIds,
   subscribeBlockSelection,
+  syncBlockDragHandles,
   syncBlockSelectionDom,
 } from '../blockSelectionStore';
 import {
+  $clampBlockSelectionRange,
   $collectOutlineItemsDFS,
   $findOutlineItemById,
   $getOutlineItem,
   $getTopLevelBlockSelection,
   $relocateOutlineItems,
-  rangeIdsBetween,
 } from '../utils/outlineHelpers';
 
 type DragMode = 'idle' | 'selecting' | 'moving';
@@ -38,11 +41,17 @@ function findOutlineDom(target: EventTarget | null): HTMLElement | null {
   return target.closest('.outline-item');
 }
 
+function findDragHandle(target: EventTarget | null): HTMLElement | null {
+  if (!(target instanceof Element)) return null;
+  return target.closest('.outline-block-handle');
+}
+
 function isGutterClick(event: MouseEvent, dom: HTMLElement): boolean {
   if (!(event.target instanceof Element)) return false;
   if (
     event.target.closest('.outline-status-chip') ||
-    event.target.closest('.outline-status-menu')
+    event.target.closest('.outline-status-menu') ||
+    event.target.closest('.outline-block-handle')
   ) {
     return false;
   }
@@ -55,16 +64,6 @@ function isGutterClick(event: MouseEvent, dom: HTMLElement): boolean {
 function outlineIdFromTarget(target: EventTarget | null): string | null {
   const dom = findOutlineDom(target);
   return dom?.getAttribute('data-outline-id') ?? null;
-}
-
-function readOrderedIds(
-  editor: ReturnType<typeof useLexicalComposerContext>[0],
-): string[] {
-  let ids: string[] = [];
-  editor.getEditorState().read(() => {
-    ids = $collectOutlineItemsDFS($getRoot()).map((item) => item.getId());
-  });
-  return ids;
 }
 
 function clearDropHint(root: HTMLElement | null): void {
@@ -129,8 +128,8 @@ function isTypingKey(event: KeyboardEvent): boolean {
 
 /**
  * Block multi-select via an external id store + DOM classes.
- * Gutter drag selects; text ranges also select their items for dragging.
- * Typing clears the block selection.
+ * Gutter drag selects; a high-contrast handle moves the selection.
+ * Click anywhere else clears the block selection.
  */
 export function BlockSelectionPlugin(): null {
   const [editor] = useLexicalComposerContext();
@@ -143,43 +142,110 @@ export function BlockSelectionPlugin(): null {
   const movedFar = useRef(false);
 
   useEffect(() => {
-    const paint = () => syncBlockSelectionDom(editor.getRootElement());
+    let paintRaf: number | null = null;
+    let textSyncRaf: number | null = null;
+    let lastTextSelKey = '';
+
+    const paint = () => {
+      const root = editor.getRootElement();
+      syncBlockSelectionDom(root);
+      syncBlockDragHandles(root);
+    };
+
+    const schedulePaint = () => {
+      if (paintRaf != null) return;
+      paintRaf = requestAnimationFrame(() => {
+        paintRaf = null;
+        paint();
+      });
+    };
 
     const syncFromTextSelection = () => {
       editor.getEditorState().read(() => {
         const selection = $getSelection();
-        if (!$isRangeSelection(selection) || selection.isCollapsed()) return;
+        if (!$isRangeSelection(selection) || selection.isCollapsed()) {
+          lastTextSelKey = '';
+          return;
+        }
         const anchorItem = $getOutlineItem(selection.anchor.getNode());
         const focusItem = $getOutlineItem(selection.focus.getNode());
         if (!anchorItem || !focusItem) return;
-        const ordered = $collectOutlineItemsDFS($getRoot()).map((item) =>
-          item.getId(),
-        );
+
+        // Skip identical selection points (Lexical fires many updates while dragging).
+        const selKey = `${selection.anchor.key}:${selection.anchor.offset}:${selection.focus.key}:${selection.focus.offset}`;
+        if (selKey === lastTextSelKey) return;
+        lastTextSelKey = selKey;
+
+        const ordered = $collectOutlineItemsDFS($getRoot());
         setBlockSelectedIds(
-          rangeIdsBetween(ordered, anchorItem.getId(), focusItem.getId()),
+          $clampBlockSelectionRange(
+            ordered,
+            anchorItem.getId(),
+            focusItem.getId(),
+          ),
         );
       });
     };
 
-    const unsub = subscribeBlockSelection(paint);
-    const removeUpdate = editor.registerUpdateListener(({ tags }) => {
-      queueMicrotask(() => {
-        paint();
-        if (
-          tags.has('historic') ||
-          tags.has('load') ||
-          tags.has('block-selection')
-        ) {
-          return;
-        }
+    const scheduleTextSync = () => {
+      if (textSyncRaf != null) return;
+      textSyncRaf = requestAnimationFrame(() => {
+        textSyncRaf = null;
         syncFromTextSelection();
       });
+    };
+
+    // Paint only when the block-selection id set changes — not on every keystroke.
+    const unsub = subscribeBlockSelection(schedulePaint);
+
+    let handleRaf: number | null = null;
+    const scheduleHandleRefresh = () => {
+      if (getBlockSelectedIds().size === 0) return;
+      if (handleRaf != null) return;
+      handleRaf = requestAnimationFrame(() => {
+        handleRaf = null;
+        syncBlockDragHandles(editor.getRootElement());
+      });
+    };
+
+    const removeUpdate = editor.registerUpdateListener(({ tags }) => {
+      if (tags.has('historic') || tags.has('load')) return;
+      // Relocate / indent keep the same ids — still need handle geometry.
+      if (tags.has('block-selection')) {
+        scheduleHandleRefresh();
+        return;
+      }
+      scheduleTextSync();
+      scheduleHandleRefresh();
     });
+
+    const root = editor.getRootElement();
+    const shell = root?.closest('.editor-shell');
+    const main = root?.closest('.main');
+    const onScrollOrResize = () => {
+      if (getBlockSelectedIds().size === 0) return;
+      if (paintRaf != null) return;
+      paintRaf = requestAnimationFrame(() => {
+        paintRaf = null;
+        syncBlockDragHandles(editor.getRootElement());
+      });
+    };
+    shell?.addEventListener('scroll', onScrollOrResize, true);
+    main?.addEventListener('scroll', onScrollOrResize, { passive: true });
+    window.addEventListener('resize', onScrollOrResize);
+
     paint();
 
     return () => {
       unsub();
       removeUpdate();
+      if (paintRaf != null) cancelAnimationFrame(paintRaf);
+      if (textSyncRaf != null) cancelAnimationFrame(textSyncRaf);
+      if (handleRaf != null) cancelAnimationFrame(handleRaf);
+      shell?.removeEventListener('scroll', onScrollOrResize, true);
+      main?.removeEventListener('scroll', onScrollOrResize);
+      window.removeEventListener('resize', onScrollOrResize);
+      disposeBlockDragHandles();
     };
   }, [editor]);
 
@@ -191,8 +257,22 @@ export function BlockSelectionPlugin(): null {
     };
 
     const applyRange = (fromId: string, toId: string) => {
-      const ordered = readOrderedIds(editor);
-      setBlockSelectedIds(rangeIdsBetween(ordered, fromId, toId));
+      let ids: string[] = [fromId];
+      editor.getEditorState().read(() => {
+        const ordered = $collectOutlineItemsDFS($getRoot());
+        ids = $clampBlockSelectionRange(ordered, fromId, toId);
+      });
+      setBlockSelectedIds(ids);
+    };
+
+    const beginMove = (id: string, event: MouseEvent) => {
+      event.preventDefault();
+      mode.current = 'moving';
+      dragAnchorId.current = id;
+      startXY.current = { x: event.clientX, y: event.clientY };
+      movedFar.current = false;
+      dropHint.current = null;
+      setDraggingClass(true);
     };
 
     const onKeyDown = (event: KeyboardEvent) => {
@@ -203,34 +283,36 @@ export function BlockSelectionPlugin(): null {
 
     const onMouseDown = (event: MouseEvent) => {
       if (event.button !== 0) return;
+      // Handles live outside contenteditable; see onWindowMouseDown.
+
       const dom = findOutlineDom(event.target);
-      if (!dom) return;
+      if (!dom) {
+        if (getBlockSelectedIds().size > 0) clearBlockSelectedIds();
+        return;
+      }
 
       const id = outlineIdFromTarget(event.target);
       if (!id) return;
 
       const selected = getBlockSelectedIds();
-      const inSelection = selected.has(id);
       const gutter = isGutterClick(event, dom);
 
-      // Relocate: gutter (or Alt) on an already-selected block
+      // Alt-drag still moves without the handle (power-user).
       if (
-        inSelection &&
+        selected.has(id) &&
         selected.size > 0 &&
         !event.shiftKey &&
-        (gutter || event.altKey)
+        event.altKey
       ) {
-        event.preventDefault();
-        mode.current = 'moving';
-        dragAnchorId.current = id;
-        startXY.current = { x: event.clientX, y: event.clientY };
-        movedFar.current = false;
-        dropHint.current = null;
-        setDraggingClass(true);
+        beginMove(id, event);
         return;
       }
 
-      if (!gutter && !event.altKey) return;
+      if (!gutter && !event.altKey) {
+        // Click on text / body → place caret and clear block selection.
+        if (selected.size > 0) clearBlockSelectedIds();
+        return;
+      }
 
       event.preventDefault();
       mode.current = 'selecting';
@@ -304,13 +386,29 @@ export function BlockSelectionPlugin(): null {
 
       if (!hint || !movedFar.current) return;
 
-      editor.update(() => {
-        const dropTarget = $findOutlineItemById($getRoot(), hint.id);
-        if (!dropTarget) return;
-        const targets = $getTopLevelBlockSelection($getRoot());
-        if (!$relocateOutlineItems(targets, dropTarget, hint.place)) return;
-        setBlockSelectedIds(targets.map((t) => t.getId()));
-      });
+      let moved = false;
+      editor.update(
+        () => {
+          const dropTarget = $findOutlineItemById($getRoot(), hint.id);
+          if (!dropTarget) return;
+          const targets = $getTopLevelBlockSelection($getRoot());
+          if (!$relocateOutlineItems(targets, dropTarget, hint.place)) return;
+          moved = true;
+          setBlockSelectedIds(targets.map((t) => t.getId()));
+        },
+        { tag: 'block-selection' },
+      );
+      // Ids are often unchanged after relocate, so the store won't notify —
+      // force handle geometry to the post-layout position.
+      if (moved) {
+        requestAnimationFrame(() => {
+          refreshBlockSelectionChrome();
+          // Second frame: Lexical/layout may still be settling.
+          requestAnimationFrame(() => {
+            syncBlockDragHandles(editor.getRootElement());
+          });
+        });
+      }
     };
 
     const onMouseUp = () => {
@@ -337,8 +435,39 @@ export function BlockSelectionPlugin(): null {
       clearDropHint(editor.getRootElement());
     };
 
+    /**
+     * Handle mousedown (overlay is outside contenteditable) and clear
+     * selection on clicks outside the editor.
+     */
+    const onWindowMouseDown = (event: MouseEvent) => {
+      if (event.button !== 0) return;
+
+      const handle = findDragHandle(event.target);
+      if (handle) {
+        const id = handle.getAttribute('data-outline-id');
+        if (id && getBlockSelectedIds().has(id)) {
+          beginMove(id, event);
+          event.stopPropagation();
+        }
+        return;
+      }
+
+      if (mode.current !== 'idle') return;
+      if (getBlockSelectedIds().size === 0) return;
+      const root = editor.getRootElement();
+      const shell = root?.closest('.editor-shell');
+      if (
+        event.target instanceof Node &&
+        (root?.contains(event.target) || shell?.contains(event.target))
+      ) {
+        return;
+      }
+      clearBlockSelectedIds();
+    };
+
     window.addEventListener('mousemove', onMouseMove);
     window.addEventListener('mouseup', onMouseUp);
+    window.addEventListener('mousedown', onWindowMouseDown, true);
 
     return mergeRegister(
       editor.registerRootListener((root, prev) => {
@@ -354,6 +483,8 @@ export function BlockSelectionPlugin(): null {
       editor.registerCommand(
         CLICK_COMMAND,
         (event: MouseEvent) => {
+          if (findDragHandle(event.target)) return true;
+
           const dom = findOutlineDom(event.target);
           if (!dom) return false;
 
@@ -368,7 +499,6 @@ export function BlockSelectionPlugin(): null {
             return true;
           }
 
-          // Keep block selection from text ranges until the user types (or Esc).
           return false;
         },
         COMMAND_PRIORITY_LOW,
@@ -385,6 +515,7 @@ export function BlockSelectionPlugin(): null {
       () => {
         window.removeEventListener('mousemove', onMouseMove);
         window.removeEventListener('mouseup', onMouseUp);
+        window.removeEventListener('mousedown', onWindowMouseDown, true);
         if (raf.current != null) cancelAnimationFrame(raf.current);
         clearDropHint(editor.getRootElement());
       },
