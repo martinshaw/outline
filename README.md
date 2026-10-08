@@ -57,7 +57,8 @@ Built with [React](https://react.dev), [Lexical](https://lexical.dev), [Vite](ht
 | **Developer panel** | Optional bottom-right panel: Overview, Nodes, Files (off by default) |
 | **Theme** | System, light, or dark (flat dark; no decorative page glow) |
 | **Fonts** | Built-in + searchable system fonts (Local Font Access) |
-| **Offline PWA** | App shell caches after first visit; data stays on disk |
+| **Offline PWA** | Installable app shell; works offline after first visit; data stays on disk |
+| **Phone-friendly** | Drawer navigation, safe areas, touch targets; install from Chrome on Android |
 
 ---
 
@@ -65,11 +66,11 @@ Built with [React](https://react.dev), [Lexical](https://lexical.dev), [Vite](ht
 
 | Requirement | Notes |
 |-------------|--------|
-| **Google Chrome** (desktop) | File System Access API; other Chromium browsers may work |
-| **Secure context** | `http://localhost` or `https://` |
+| **Google Chrome** (desktop or recent Android) | File System Access API; other Chromium browsers may work |
+| **Secure context** | `http://localhost` or `https://` (required for folder access and install) |
 | **Folder permission** | Read/write access to a directory you choose |
 
-Safari and Firefox are **not** supported for folder persistence.
+Safari and Firefox are **not** supported for folder persistence. iOS can install the PWA shell, but **cannot** pick a notes folder yet (no File System Access API).
 
 **Embedded / IDE browsers are not supported** — including Cursor’s Simple Browser / integrated browser preview. Those environments typically lack a working File System Access API (and sometimes a proper secure context), so folder pick and persistence will fail. Open the Vite URL in desktop Chrome instead (e.g. `http://localhost:5173`).
 
@@ -405,7 +406,18 @@ Selection export requires at least one block selected.
 - **Notes still require** access to your chosen folder. Offline editing works once permission is granted and the handle is available.
 - Returning later, Chrome may ask you to re-confirm folder access — use the gate screen or **Change folder**.
 
-Optional install: Chrome → install icon / “Install Outline” for a standalone window.
+### Install on phone or desktop
+
+1. Open the deployed site (or a local HTTPS/`localhost` build) in **Chrome**.
+2. Use **Install app** / **Add to Home screen** (Chrome menu or the install icon in the address bar).
+3. Outline opens standalone (no browser chrome), with notch-safe layout on phones.
+4. On **Android Chrome**, pick your notes folder as usual. On **iPhone/iPad**, install works for the shell only — folder access is not available in Safari/WebKit.
+
+### Small screens
+
+- Notes list becomes a **slide-over drawer** (☰); choosing a day/item closes it.
+- Editor gutters tighten so more of each line is visible.
+- Dialogs and the developer panel adapt to narrow viewports and home-indicator insets.
 
 ---
 

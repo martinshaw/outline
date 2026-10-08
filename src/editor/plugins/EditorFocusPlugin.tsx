@@ -18,6 +18,7 @@ function isUiChromeTarget(target: EventTarget | null): boolean {
         'a',
         '[role="dialog"]',
         '.sidebar',
+        '.sidebar-backdrop',
         '.topbar',
         '.top-menu',
         '.settings-overlay',

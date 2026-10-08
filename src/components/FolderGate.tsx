@@ -45,8 +45,10 @@ export function FolderGate({
               </>
             ) : (
               <>
-                This browser does not support the File System Access API. Please
-                use Google Chrome (desktop).
+                This browser does not support the File System Access API. Use
+                Google Chrome on desktop, or Chrome on Android with a recent
+                version. Installable as a PWA, but folder access still requires
+                a supporting Chromium browser.
               </>
             )}
           </p>
