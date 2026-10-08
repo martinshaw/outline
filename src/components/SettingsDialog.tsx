@@ -1,0 +1,367 @@
+import { useEffect, useId, useRef, useState } from 'react';
+import {
+  listLocalFontFamilies,
+  supportsLocalFonts,
+} from '../settings/localFonts';
+import {
+  getSettings,
+  resetSettings,
+  sanitizeBackupDirectory,
+  setSettings,
+  subscribeSettings,
+} from '../settings/settingsStore';
+import {
+  BACKUP_MODE_OPTIONS,
+  FONT_SIZE_DEFAULT,
+  FONT_SIZE_MAX,
+  FONT_SIZE_MIN,
+  FONT_SIZE_STEP,
+  SAVE_DEBOUNCE_OPTIONS,
+  THEME_OPTIONS,
+  type AppSettings,
+  type BackupMode,
+  type ThemeId,
+} from '../settings/types';
+import { FontPicker, type FontPickerValue } from './FontPicker';
+
+type Props = {
+  open: boolean;
+  onClose: () => void;
+};
+
+type SettingsSectionId = 'editor' | 'appearance' | 'backups' | 'saving';
+
+const SECTIONS: { id: SettingsSectionId; label: string }[] = [
+  { id: 'editor', label: 'Editor' },
+  { id: 'appearance', label: 'Appearance' },
+  { id: 'backups', label: 'Backups' },
+  { id: 'saving', label: 'Saving' },
+];
+
+function fontPickerValue(settings: AppSettings): FontPickerValue {
+  if (settings.systemFontFamily) {
+    return { kind: 'local', family: settings.systemFontFamily };
+  }
+  return { kind: 'preset', font: settings.font };
+}
+
+export function SettingsDialog({ open, onClose }: Props) {
+  const titleId = useId();
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const [settings, setLocal] = useState<AppSettings>(() => getSettings());
+  const [backupDirDraft, setBackupDirDraft] = useState(settings.backupDirectory);
+  const [localFamilies, setLocalFamilies] = useState<string[]>([]);
+  const [localStatus, setLocalStatus] = useState<string | null>(null);
+  const [localBusy, setLocalBusy] = useState(false);
+  const [section, setSection] = useState<SettingsSectionId>('editor');
+
+  const localFontsOk = supportsLocalFonts();
+  const sectionLabel =
+    SECTIONS.find((s) => s.id === section)?.label ?? 'Settings';
+
+  useEffect(() => {
+    return subscribeSettings((next) => {
+      setLocal(next);
+      setBackupDirDraft(next.backupDirectory);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    const latest = getSettings();
+    setLocal(latest);
+    setBackupDirDraft(latest.backupDirectory);
+    setLocalStatus(null);
+    setSection('editor');
+    closeRef.current?.focus();
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  const backupMeta = BACKUP_MODE_OPTIONS.find((o) => o.id === settings.backupMode);
+
+  const commitBackupDir = () => {
+    const next = sanitizeBackupDirectory(backupDirDraft);
+    setBackupDirDraft(next);
+    if (next !== settings.backupDirectory) {
+      setSettings({ backupDirectory: next });
+    }
+  };
+
+  const loadSystemFonts = async () => {
+    if (!localFontsOk) {
+      setLocalStatus('System fonts require desktop Chrome or Edge.');
+      return;
+    }
+    setLocalBusy(true);
+    setLocalStatus(null);
+    try {
+      const families = await listLocalFontFamilies();
+      setLocalFamilies(families);
+      if (families.length === 0) {
+        setLocalStatus('No local fonts were returned.');
+      } else {
+        setLocalStatus(
+          `${families.length} system fonts added — pick one from the list.`,
+        );
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setLocalStatus(
+        msg.includes('NotAllowed') || msg.includes('denied')
+          ? 'Permission to read local fonts was denied.'
+          : msg,
+      );
+    } finally {
+      setLocalBusy(false);
+    }
+  };
+
+  const onFontPicked = (next: FontPickerValue) => {
+    if (next.kind === 'preset') {
+      setSettings({ font: next.font, systemFontFamily: null });
+      return;
+    }
+    setSettings({ systemFontFamily: next.family });
+  };
+
+  return (
+    <div className="settings-overlay" role="presentation" onMouseDown={onClose}>
+      <div
+        className="settings-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <header className="settings-dialog__header">
+          <h2 id={titleId} className="settings-dialog__title">
+            Settings
+          </h2>
+          <button
+            ref={closeRef}
+            type="button"
+            className="settings-dialog__close"
+            aria-label="Close"
+            onClick={onClose}
+          >
+            ×
+          </button>
+        </header>
+
+        <div className="settings-dialog__layout">
+          <nav className="settings-nav" aria-label="Settings sections">
+            <ul className="settings-nav__list">
+              {SECTIONS.map((item) => (
+                <li key={item.id}>
+                  <button
+                    type="button"
+                    className={
+                      section === item.id
+                        ? 'settings-nav__item settings-nav__item--active'
+                        : 'settings-nav__item'
+                    }
+                    aria-current={section === item.id ? 'page' : undefined}
+                    onClick={() => setSection(item.id)}
+                  >
+                    {item.label}
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <button
+              type="button"
+              className="settings-nav__reset"
+              onClick={() => {
+                resetSettings();
+                setLocalFamilies([]);
+                setLocalStatus(null);
+              }}
+            >
+              Reset to defaults
+            </button>
+          </nav>
+
+          <div className="settings-dialog__panel">
+            <h3 className="settings-dialog__panel-title">{sectionLabel}</h3>
+
+            {section === 'editor' && (
+              <section className="settings-section" aria-label="Editor">
+                <div className="settings-field">
+                  <span className="settings-field__label">Font</span>
+                  <FontPicker
+                    value={fontPickerValue(settings)}
+                    localFamilies={localFamilies}
+                    localFontsOk={localFontsOk}
+                    localBusy={localBusy}
+                    onChange={onFontPicked}
+                    onAddSystemFonts={() => void loadSystemFonts()}
+                  />
+                  <p className="settings-field__hint">
+                    {localFontsOk
+                      ? 'Type to search. Choose Add system fonts… to grant access and list installed fonts.'
+                      : 'Built-in fonts only — Local Font Access needs desktop Chrome or Edge.'}
+                  </p>
+                  {localStatus && (
+                    <p className="settings-field__hint" role="status">
+                      {localStatus}
+                    </p>
+                  )}
+                </div>
+
+                <label className="settings-field">
+                  <span className="settings-field__label">
+                    Size
+                    <span className="settings-field__value">
+                      {settings.fontSize.toFixed(2)}rem
+                      {settings.fontSize === FONT_SIZE_DEFAULT
+                        ? ' · default'
+                        : ''}
+                    </span>
+                  </span>
+                  <input
+                    className="settings-field__slider"
+                    type="range"
+                    min={FONT_SIZE_MIN}
+                    max={FONT_SIZE_MAX}
+                    step={FONT_SIZE_STEP}
+                    value={settings.fontSize}
+                    onChange={(e) =>
+                      setSettings({ fontSize: Number(e.target.value) })
+                    }
+                  />
+                  <span className="settings-field__slider-ends" aria-hidden="true">
+                    <span>Smaller</span>
+                    <span>Larger</span>
+                  </span>
+                </label>
+
+                <p
+                  className="settings-preview"
+                  style={{
+                    fontFamily: 'var(--editor-font-family)',
+                    fontSize: 'var(--editor-font-size)',
+                  }}
+                >
+                  The quick brown fox jumps over the lazy dog.
+                </p>
+              </section>
+            )}
+
+            {section === 'appearance' && (
+              <section className="settings-section" aria-label="Appearance">
+                <label className="settings-field">
+                  <span className="settings-field__label">Theme</span>
+                  <select
+                    className="settings-field__control"
+                    value={settings.theme}
+                    onChange={(e) =>
+                      setSettings({ theme: e.target.value as ThemeId })
+                    }
+                  >
+                    {THEME_OPTIONS.map((opt) => (
+                      <option key={opt.id} value={opt.id}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="settings-field settings-field--row">
+                  <span className="settings-field__label">Collapse sidebar</span>
+                  <input
+                    type="checkbox"
+                    className="settings-field__checkbox"
+                    checked={settings.sidebarCollapsed}
+                    onChange={(e) =>
+                      setSettings({ sidebarCollapsed: e.target.checked })
+                    }
+                  />
+                </label>
+              </section>
+            )}
+
+            {section === 'backups' && (
+              <section className="settings-section" aria-label="Backups">
+                <label className="settings-field">
+                  <span className="settings-field__label">When to backup</span>
+                  <select
+                    className="settings-field__control"
+                    value={settings.backupMode}
+                    onChange={(e) =>
+                      setSettings({
+                        backupMode: e.target.value as BackupMode,
+                      })
+                    }
+                  >
+                    {BACKUP_MODE_OPTIONS.map((opt) => (
+                      <option key={opt.id} value={opt.id}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {backupMeta && (
+                  <p className="settings-field__hint">{backupMeta.description}</p>
+                )}
+
+                <label className="settings-field">
+                  <span className="settings-field__label">Backup folder name</span>
+                  <input
+                    className="settings-field__control"
+                    type="text"
+                    value={backupDirDraft}
+                    disabled={settings.backupMode === 'off'}
+                    spellCheck={false}
+                    autoComplete="off"
+                    onChange={(e) => setBackupDirDraft(e.target.value)}
+                    onBlur={commitBackupDir}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        commitBackupDir();
+                      }
+                    }}
+                  />
+                </label>
+                <p className="settings-field__hint">
+                  Sibling of <code>notes/</code> in your workspace folder. Letters,
+                  numbers, dots, underscores, and hyphens only.
+                </p>
+              </section>
+            )}
+
+            {section === 'saving' && (
+              <section className="settings-section" aria-label="Saving">
+                <label className="settings-field">
+                  <span className="settings-field__label">Autosave delay</span>
+                  <select
+                    className="settings-field__control"
+                    value={settings.saveDebounceMs}
+                    onChange={(e) =>
+                      setSettings({ saveDebounceMs: Number(e.target.value) })
+                    }
+                  >
+                    {SAVE_DEBOUNCE_OPTIONS.map((opt) => (
+                      <option key={opt.ms} value={opt.ms}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </section>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
