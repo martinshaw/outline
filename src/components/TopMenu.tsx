@@ -69,7 +69,7 @@ export function TopMenu({
     <div className="top-menu" ref={rootRef}>
       <button
         type="button"
-        className="top-menu__trigger"
+        className="btn btn--ghost btn--nav top-menu__trigger"
         aria-expanded={open}
         aria-controls={menuId}
         onClick={() => setOpen((v) => !v)}
@@ -86,7 +86,7 @@ export function TopMenu({
             </div>
             <button
               type="button"
-              className="top-menu__item"
+              className="btn btn--secondary btn--menu btn--block btn--spread"
               role="menuitem"
               onClick={() => {
                 onChangeFolder();
@@ -97,7 +97,7 @@ export function TopMenu({
             </button>
             <button
               type="button"
-              className="top-menu__item"
+              className="btn btn--secondary btn--menu btn--block btn--spread"
               role="menuitem"
               onClick={() => {
                 onInsertTestHierarchy();
@@ -108,7 +108,7 @@ export function TopMenu({
             </button>
             <button
               type="button"
-              className="top-menu__item"
+              className="btn btn--secondary btn--menu btn--block btn--spread"
               role="menuitem"
               onClick={() => {
                 onOpenShortcuts();
@@ -120,7 +120,7 @@ export function TopMenu({
             </button>
             <button
               type="button"
-              className="top-menu__item"
+              className="btn btn--secondary btn--menu btn--block btn--spread"
               role="menuitem"
               onClick={() => {
                 onOpenSettings();
@@ -138,7 +138,7 @@ export function TopMenu({
                 <button
                   key={`day-${format}`}
                   type="button"
-                  className="top-menu__chip"
+                  className="btn btn--secondary btn--md"
                   role="menuitem"
                   onClick={() => runExport('day', format)}
                 >
@@ -155,7 +155,7 @@ export function TopMenu({
                 <button
                   key={`sel-${format}`}
                   type="button"
-                  className="top-menu__chip"
+                  className="btn btn--secondary btn--md"
                   role="menuitem"
                   onClick={() => runExport('selection', format)}
                 >

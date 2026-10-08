@@ -1,3 +1,11 @@
+/* Length so 0.5lh is computed on the row and inherited by chip/label
+   (unregistered custom props re-resolve lh against their own font). */
+@property --outline-align-y {
+  syntax: '<length>';
+  inherits: true;
+  initial-value: 0px;
+}
+
 :root {
   color-scheme: light dark;
   --ink: #1a1f1c;
@@ -19,7 +27,8 @@
   --editor-font-size: 1.05rem;
   --theme-color: #1a1f1c;
   /* Light mode: soft light veil; dark mode: dark scrim */
-  --dialog-backdrop: rgb(255 255 255 / 0.45);
+  --dialog-backdrop: rgb(255 255 255 / 0.54);
+  --dialog-edge: color-mix(in srgb, var(--ink) 12%, var(--line));
 }
 
 @media (prefers-color-scheme: dark) {
@@ -35,10 +44,11 @@
     --project: #e0a45a;
     --task: #7aa2ff;
     --danger: #e07070;
-    --glow-a: #1c2820;
-    --glow-b: #1a2228;
+    --glow-a: transparent;
+    --glow-b: transparent;
     --theme-color: #161a17;
-    --dialog-backdrop: rgb(0 0 0 / 0.55);
+    --dialog-backdrop: rgb(0 0 0 / 0.62);
+    --dialog-edge: color-mix(in srgb, var(--ink) 14%, var(--line));
   }
 }
 
@@ -54,15 +64,16 @@
   --project: #e0a45a;
   --task: #7aa2ff;
   --danger: #e07070;
-  --glow-a: #1c2820;
-  --glow-b: #1a2228;
+  --glow-a: transparent;
+  --glow-b: transparent;
   --theme-color: #161a17;
-  --dialog-backdrop: rgb(0 0 0 / 0.55);
+  --dialog-backdrop: rgb(0 0 0 / 0.62);
+  --dialog-edge: color-mix(in srgb, var(--ink) 14%, var(--line));
 }
 
 :root[data-theme='light'] {
   color-scheme: light;
-  --dialog-backdrop: rgb(255 255 255 / 0.45);
+  --dialog-backdrop: rgb(255 255 255 / 0.54);
 }
 
 *,
@@ -86,6 +97,26 @@ body {
     radial-gradient(900px 500px at 100% 0%, var(--glow-b) 0%, transparent 50%),
     var(--paper);
   -webkit-font-smoothing: antialiased;
+  /* UI chrome is non-selectable so ⌘A only hits the Lexical document */
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Editable Lexical text (and form fields in dialogs) may be selected */
+.editor-input,
+input,
+textarea,
+select {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/* Keep editor chrome non-selectable even inside the contenteditable */
+.editor-input .outline-status-chip,
+.editor-input .outline-status-menu,
+.editor-input .outline-status-menu * {
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 button {
@@ -94,15 +125,212 @@ button {
   cursor: pointer;
 }
 
+/* —— Shared buttons ——
+   Solid paper fill + strong backdrop blur; size/layout tokens only change footprint. */
+.btn {
+  --btn-fs: 0.72rem;
+  --btn-py: 0.4rem;
+  --btn-px: 0.65rem;
+  --btn-ls: 0;
+  appearance: none;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--paper) 88%, transparent);
+  -webkit-backdrop-filter: blur(18px) saturate(1.2);
+  backdrop-filter: blur(18px) saturate(1.2);
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: var(--btn-fs);
+  line-height: 1.2;
+  letter-spacing: var(--btn-ls);
+  padding: var(--btn-py) var(--btn-px);
+  cursor: pointer;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent-soft) 82%, var(--paper));
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--line));
+  color: var(--ink);
+  -webkit-backdrop-filter: blur(22px) saturate(1.25);
+  backdrop-filter: blur(22px) saturate(1.25);
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Variants share the same solid + blur chrome */
+.btn--primary,
+.btn--secondary,
+.btn--ghost {
+  background: color-mix(in srgb, var(--paper) 88%, transparent);
+  border-color: var(--line);
+  color: var(--ink);
+}
+
+.btn--primary:hover:not(:disabled),
+.btn--secondary:hover:not(:disabled),
+.btn--ghost:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent-soft) 82%, var(--paper));
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--line));
+  color: var(--ink);
+}
+
+.btn--danger {
+  background: color-mix(in srgb, var(--paper) 88%, transparent);
+  border-color: var(--line);
+  color: var(--ink-muted);
+}
+
+.btn--danger:hover:not(:disabled) {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 14%, var(--paper));
+  border-color: color-mix(in srgb, var(--danger) 35%, var(--line));
+}
+
+/* Sizes — match prior control footprints */
+.btn--sm {
+  --btn-fs: 0.62rem;
+  --btn-py: 0.12rem;
+  --btn-px: 0.4rem;
+}
+
+.btn--md {
+  --btn-fs: 0.72rem;
+  --btn-py: 0.4rem;
+  --btn-px: 0.65rem;
+}
+
+.btn--lg {
+  --btn-fs: 0.95rem;
+  --btn-py: 0.7rem;
+  --btn-px: 1.1rem;
+}
+
+.btn--nav {
+  --btn-fs: 0.62rem;
+  --btn-py: 0.2rem;
+  --btn-px: 0.4rem;
+  --btn-ls: 0.08em;
+  text-transform: uppercase;
+}
+
+.btn--menu {
+  --btn-fs: 0.92rem;
+  --btn-py: 0.55rem;
+  --btn-px: 0.7rem;
+}
+
+.btn--rail {
+  --btn-fs: 0.84rem;
+  --btn-py: 0.4rem;
+  --btn-px: 0.55rem;
+}
+
+.btn--icon {
+  --btn-fs: 1.35rem;
+  --btn-py: 0.15rem;
+  --btn-px: 0.35rem;
+  line-height: 1;
+  min-width: 1.85rem;
+  min-height: 1.85rem;
+}
+
+.btn--icon-sm {
+  --btn-fs: 0.72rem;
+  --btn-py: 0;
+  --btn-px: 0;
+  width: 1.45rem;
+  height: 1.45rem;
+  min-width: 1.45rem;
+  padding: 0;
+  line-height: 1;
+}
+
+.btn--block {
+  display: flex;
+  width: 100%;
+}
+
+.btn--spread {
+  justify-content: space-between;
+  text-align: left;
+}
+
+.btn--start {
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.btn--active {
+  background: color-mix(in srgb, var(--accent-soft) 88%, var(--paper));
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--line));
+  color: var(--ink);
+  font-weight: 500;
+  -webkit-backdrop-filter: blur(22px) saturate(1.25);
+  backdrop-filter: blur(22px) saturate(1.25);
+}
+
+.btn--active:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent-soft) 92%, var(--paper));
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+  color: var(--ink);
+}
+
 /* —— Gate —— */
 .gate {
+  position: relative;
+  isolation: isolate;
   min-height: 100%;
   display: grid;
   place-items: center;
   padding: 2rem;
+  overflow: hidden;
+}
+
+/* Luxury tile — ink via alpha mask (luminance masks hide black strokes) */
+.gate::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: var(--ink);
+  opacity: 0.03;
+  -webkit-mask-image: url('./assets/patterns/gate-lux.svg');
+  mask-image: url('./assets/patterns/gate-lux.svg');
+  -webkit-mask-size: 140px 140px;
+  mask-size: 140px 140px;
+  -webkit-mask-repeat: repeat;
+  mask-repeat: repeat;
+  /* Critical: use stroke alpha, not luminance (black ⇒ invisible) */
+  -webkit-mask-source-type: alpha;
+  mask-mode: alpha;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .gate::before {
+    opacity: 0.04;
+  }
+}
+
+:root[data-theme='dark'] .gate::before {
+  opacity: 0.04;
 }
 
 .gate__panel {
+  position: relative;
+  z-index: 1;
   max-width: 28rem;
   width: 100%;
 }
@@ -140,37 +368,23 @@ button {
   margin: 0 0 1rem;
 }
 
-.gate__btn {
-  appearance: none;
-  display: block;
-  width: 100%;
-  border: 1px solid var(--ink);
-  background: var(--ink);
-  color: var(--paper);
-  padding: 0.7rem 1.1rem;
-  border-radius: 2px;
-  margin: 0 0 0.55rem;
+.gate__panel > .btn + .btn {
+  margin-top: 0.55rem;
 }
 
-.gate__btn:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
+.gate__github {
+  display: inline-block;
+  margin-top: 1.1rem;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  text-decoration: none;
 }
 
-.gate__btn:hover:not(:disabled) {
-  background: var(--accent);
-  border-color: var(--accent);
-}
-
-.gate__btn--secondary {
-  background: transparent;
-  color: var(--ink);
-}
-
-.gate__btn--secondary:hover:not(:disabled) {
-  background: var(--accent-soft);
-  border-color: var(--accent);
-  color: var(--ink);
+.gate__github:hover {
+  color: var(--accent);
 }
 
 /* —— App shell —— */
@@ -195,25 +409,6 @@ button {
   align-items: center;
   gap: 0.35rem;
   min-width: 0;
-}
-
-.topbar__sidebar-btn {
-  appearance: none;
-  border: 0;
-  background: transparent;
-  width: 1.45rem;
-  height: 1.45rem;
-  border-radius: 2px;
-  font-size: 0.72rem;
-  line-height: 1;
-  color: var(--ink-muted);
-  display: grid;
-  place-items: center;
-}
-
-.topbar__sidebar-btn:hover {
-  background: color-mix(in srgb, var(--accent-soft) 70%, transparent);
-  color: var(--ink);
 }
 
 .topbar__brand {
@@ -251,43 +446,9 @@ button {
   opacity: 0.9;
 }
 
-.topbar__btn {
-  appearance: none;
-  border: 0;
-  background: transparent;
-  padding: 0.2rem 0.4rem;
-  border-radius: 2px;
-  font-family: var(--font-mono);
-  font-size: 0.65rem;
-  color: var(--ink-muted);
-}
-
-.topbar__btn:hover {
-  color: var(--ink);
-  background: color-mix(in srgb, var(--accent-soft) 70%, transparent);
-}
-
 /* —— Top menu —— */
 .top-menu {
   position: relative;
-}
-
-.top-menu__trigger {
-  appearance: none;
-  border: 0;
-  background: transparent;
-  color: var(--ink-muted);
-  padding: 0.2rem 0.4rem;
-  border-radius: 2px;
-  font-family: var(--font-mono);
-  font-size: 0.62rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.top-menu__trigger:hover {
-  color: var(--ink);
-  background: color-mix(in srgb, var(--accent-soft) 70%, transparent);
 }
 
 .top-menu__trigger[aria-expanded='true'] {
@@ -303,7 +464,6 @@ button {
   padding: 0.75rem;
   background: var(--paper);
   border: 1px solid var(--line);
-  box-shadow: 0 12px 40px color-mix(in srgb, var(--ink) 12%, transparent);
   display: flex;
   flex-direction: column;
   gap: 0.85rem;
@@ -332,44 +492,10 @@ button {
   white-space: nowrap;
 }
 
-.top-menu__item {
-  appearance: none;
-  border: 1px solid var(--line);
-  background: transparent;
-  text-align: left;
-  padding: 0.55rem 0.7rem;
-  border-radius: 2px;
-  font-size: 0.92rem;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-}
-
-.top-menu__item:hover {
-  background: var(--accent-soft);
-  border-color: color-mix(in srgb, var(--accent) 35%, var(--line));
-}
-
 .top-menu__row {
   display: flex;
   flex-wrap: wrap;
   gap: 0.35rem;
-}
-
-.top-menu__chip {
-  appearance: none;
-  border: 1px solid var(--line);
-  background: color-mix(in srgb, var(--paper-deep) 60%, transparent);
-  padding: 0.4rem 0.65rem;
-  border-radius: 2px;
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-}
-
-.top-menu__chip:hover {
-  border-color: var(--accent);
-  background: var(--accent-soft);
 }
 
 .top-menu__hint {
@@ -496,6 +622,15 @@ button {
 
 /* —— Main —— */
 .main {
+  /* Shared with outline chrome so the day title lines up with bullets */
+  --outline-gap: 0.5rem;
+  --outline-bullet: 0.42rem;
+  --outline-label: 3.4rem;
+  --outline-gutter: calc(
+    var(--outline-label) + var(--outline-bullet) + var(--outline-gap)
+  );
+  /* Per-level nest step only — not the full label gutter */
+  --outline-nest: 1.25rem;
   min-width: 0;
   overflow: auto;
   padding: 1.25rem 1.5rem 3rem;
@@ -505,6 +640,8 @@ button {
   font-size: 1.35rem;
   font-weight: 600;
   margin: 0 0 1rem;
+  /* Sit on the bullet column (label gutter is empty padding to the left) */
+  padding-left: var(--outline-label);
 }
 
 /* —— Toasts —— */
@@ -596,7 +733,7 @@ button {
 .editor-placeholder {
   position: absolute;
   top: 0;
-  left: calc(0.42rem + 0.5rem);
+  left: var(--outline-gutter);
   color: var(--ink-muted);
   pointer-events: none;
   opacity: 0.7;
@@ -623,27 +760,37 @@ button {
 
 /* —— Outline items —— */
 .outline-item {
-  --outline-gap: 0.5rem;
-  --outline-bullet: 0.42rem;
-  --outline-gutter: calc(var(--outline-bullet) + var(--outline-gap));
+  --outline-pad: var(--outline-gutter);
+  --outline-bullet-x: var(--outline-label);
+  --outline-chip-x: var(--outline-gutter);
+  /* Resolve lh on the row (not on chip/label, which use smaller fonts) */
+  --outline-align-y: 0.5lh;
   position: relative;
-  /* Gutter for the absolute bullet so caret/text never sit under it */
-  padding-left: var(--outline-gutter);
+  /* Gutter for label + bullet so caret/text never sit under them */
+  padding-left: var(--outline-pad);
   margin: 0.15rem 0;
   min-height: 1.55em;
   line-height: inherit;
   cursor: text;
 }
 
+/*
+ * Nested rows: small nest step only. Do not re-apply the root kind-label
+ * column (that was stacking ~4rem+ per level into a staircase).
+ */
 .outline-item .outline-item {
-  margin-left: var(--outline-gutter);
+  --outline-pad: calc(var(--outline-bullet) + var(--outline-gap));
+  --outline-bullet-x: 0px;
+  --outline-chip-x: calc(var(--outline-bullet) + var(--outline-gap));
+  margin-left: var(--outline-nest);
 }
 
-/* Bullet in the gutter — content (chip + text + caret) starts after padding */
-.outline-bullet {
+/* Bullet via ::before — not a DOM sibling, so empty-row caret stays on-line */
+.outline-item::before {
+  content: '';
   position: absolute;
-  left: 0;
-  top: 0.5lh;
+  left: var(--outline-bullet-x);
+  top: var(--outline-align-y);
   transform: translateY(-50%);
   display: block;
   width: var(--outline-bullet);
@@ -656,12 +803,50 @@ button {
   pointer-events: none;
 }
 
-.outline-item--project > .outline-bullet {
+.outline-item--project::before {
   border-color: color-mix(in srgb, var(--project) 75%, transparent);
 }
 
-.outline-item--task > .outline-bullet {
+.outline-item--task::before {
   border-color: color-mix(in srgb, var(--task) 75%, transparent);
+}
+
+/* Kind label via ::after + data-kind-label (also not a DOM sibling) */
+.outline-item[data-kind-label]::after {
+  content: attr(data-kind-label);
+  position: absolute;
+  left: 0;
+  top: var(--outline-align-y);
+  transform: translateY(-50%);
+  width: var(--outline-label);
+  padding-right: 0.3rem;
+  box-sizing: border-box;
+  text-align: right;
+  font-family: var(--font-mono);
+  font-size: 0.52rem;
+  font-weight: 500;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  line-height: 1;
+  color: color-mix(in srgb, var(--ink-muted) 42%, transparent);
+  pointer-events: none;
+  user-select: none;
+  white-space: nowrap;
+}
+
+/* Nested kind labels sit just left of the bullet (no second label column) */
+.outline-item .outline-item[data-kind-label]::after {
+  left: auto;
+  right: calc(100% - var(--outline-bullet-x));
+  width: auto;
+  padding-right: 0.35rem;
+}
+
+/* Chip sits in the content column; text starts after --outline-chip-indent */
+.outline-item:has(> .outline-status-chip) {
+  padding-left: calc(
+    var(--outline-pad) + var(--outline-chip-indent, 3.25em) + var(--outline-gap)
+  );
 }
 
 .outline-status-chip {
@@ -669,11 +854,13 @@ button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  vertical-align: middle;
-  position: relative;
+  position: absolute;
+  left: var(--outline-chip-x);
+  top: var(--outline-align-y);
+  transform: translateY(-50%);
   z-index: 1;
   box-sizing: border-box;
-  margin: 0 var(--outline-gap) 0 0;
+  margin: 0;
   padding: 0.12em 0.45em;
   border: 0;
   border-radius: 999px;
@@ -688,6 +875,8 @@ button {
   line-height: 1.2;
   white-space: nowrap;
   cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .outline-status-chip:hover,
@@ -704,7 +893,6 @@ button {
   border: 1px solid var(--line);
   border-radius: 4px;
   background: var(--paper);
-  box-shadow: 0 8px 24px color-mix(in srgb, #000 16%, transparent);
   display: flex;
   flex-direction: column;
   gap: 0.15rem;
@@ -782,10 +970,6 @@ button {
   cursor: grabbing;
 }
 
-.outline-item--project {
-  font-weight: 600;
-}
-
 .outline-item--heading {
   font-weight: 650;
   letter-spacing: -0.01em;
@@ -854,7 +1038,7 @@ button {
   display: flex;
   flex-direction: column;
   background: var(--paper);
-  border: 1px solid var(--line);
+  border: 1px solid var(--dialog-edge);
   border-radius: 4px;
   overflow: hidden;
 }
@@ -872,22 +1056,6 @@ button {
   margin: 0;
   font-size: 1.05rem;
   font-weight: 600;
-}
-
-.shortcuts-dialog__close {
-  appearance: none;
-  border: 0;
-  background: transparent;
-  color: var(--ink-muted);
-  font-size: 1.35rem;
-  line-height: 1;
-  padding: 0.15rem 0.35rem;
-  border-radius: 2px;
-}
-
-.shortcuts-dialog__close:hover {
-  background: var(--accent-soft);
-  color: var(--ink);
 }
 
 .shortcuts-dialog__body {
@@ -1004,20 +1172,37 @@ button {
   gap: 0.35rem;
 }
 
-.debug-overlay__btn {
-  appearance: none;
-  border: 1px solid var(--line);
-  background: var(--paper);
-  color: var(--ink-muted);
-  border-radius: 2px;
-  padding: 0.12rem 0.4rem;
-  font: inherit;
-  font-size: 0.62rem;
+.debug-overlay__tabs {
+  display: flex;
+  gap: 0;
+  flex: 0 0 auto;
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--paper-deep) 40%, var(--paper));
 }
 
-.debug-overlay__btn:hover {
+.debug-overlay__tab {
+  appearance: none;
+  border: 0;
+  border-right: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink-muted);
+  padding: 0.28rem 0.65rem;
+  font: inherit;
+  font-size: 0.62rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.debug-overlay__tab:hover {
   color: var(--ink);
   background: var(--accent-soft);
+}
+
+.debug-overlay__tab--active {
+  color: var(--ink);
+  background: var(--paper);
+  font-weight: 600;
 }
 
 .debug-overlay__body {
@@ -1025,6 +1210,100 @@ button {
   min-height: 0;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
+}
+
+.debug-overlay__body:has(> .debug-overlay__panel) {
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.debug-overlay__panel {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 0.4rem 0.55rem 0.5rem;
+}
+
+.debug-overlay__panel-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex: 0 0 auto;
+  margin-bottom: 0.25rem;
+}
+
+.debug-overlay__panel-bar .debug-overlay__h {
+  margin: 0;
+}
+
+.debug-tree {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+  padding-right: 0.15rem;
+}
+
+.debug-tree__row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  min-width: 0;
+  color: var(--ink-muted);
+}
+
+.debug-tree__row--focus {
+  color: var(--ink);
+  background: var(--accent-soft);
+}
+
+.debug-tree__row--sel .debug-tree__id {
+  color: var(--accent);
+}
+
+.debug-tree__twist {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  width: 0.9rem;
+  padding: 0;
+  flex: 0 0 auto;
+  cursor: pointer;
+  text-align: center;
+  opacity: 0.85;
+}
+
+.debug-tree__twist:disabled,
+.debug-tree__twist--leaf {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.debug-tree__kind {
+  flex: 0 0 auto;
+  color: var(--accent);
+  font-size: 0.6rem;
+  text-transform: lowercase;
+  min-width: 4.5rem;
+}
+
+.debug-tree__id {
+  flex: 0 0 auto;
+  opacity: 0.75;
+  font-size: 0.58rem;
+}
+
+.debug-tree__label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink);
 }
 
 .debug-overlay__stats {
@@ -1138,7 +1417,7 @@ button {
   display: flex;
   flex-direction: column;
   background: var(--paper);
-  border: 1px solid var(--line);
+  border: 1px solid var(--dialog-edge);
   border-radius: 4px;
   overflow: hidden;
 }
@@ -1157,22 +1436,6 @@ button {
   margin: 0;
   font-size: 0.95rem;
   font-weight: 600;
-}
-
-.settings-dialog__close {
-  appearance: none;
-  border: 0;
-  background: transparent;
-  color: var(--ink-muted);
-  font-size: 1.35rem;
-  line-height: 1;
-  padding: 0.15rem 0.35rem;
-  border-radius: 2px;
-}
-
-.settings-dialog__close:hover {
-  background: var(--accent-soft);
-  color: var(--ink);
 }
 
 .settings-dialog__layout {
@@ -1203,47 +1466,6 @@ button {
   flex: 1;
   min-height: 0;
   overflow: auto;
-}
-
-.settings-nav__item {
-  appearance: none;
-  width: 100%;
-  border: 0;
-  background: transparent;
-  text-align: left;
-  padding: 0.4rem 0.55rem;
-  border-radius: 3px;
-  font-size: 0.84rem;
-  color: var(--ink-muted);
-}
-
-.settings-nav__item:hover {
-  background: color-mix(in srgb, var(--accent-soft) 55%, transparent);
-  color: var(--ink);
-}
-
-.settings-nav__item--active {
-  background: var(--accent-soft);
-  color: var(--ink);
-  font-weight: 500;
-}
-
-.settings-nav__reset {
-  appearance: none;
-  border: 0;
-  background: transparent;
-  color: var(--ink-muted);
-  text-align: left;
-  padding: 0.35rem 0.55rem;
-  border-radius: 3px;
-  font-family: var(--font-mono);
-  font-size: 0.62rem;
-  letter-spacing: 0.02em;
-}
-
-.settings-nav__reset:hover {
-  color: var(--danger);
-  background: color-mix(in srgb, var(--danger) 10%, transparent);
 }
 
 .settings-dialog__panel {
@@ -1308,13 +1530,14 @@ button {
     overflow: visible;
   }
 
-  .settings-nav__item {
+  .settings-nav .btn--rail {
     width: auto;
-    font-size: 0.78rem;
-    padding: 0.3rem 0.5rem;
+    --btn-fs: 0.78rem;
+    --btn-py: 0.3rem;
+    --btn-px: 0.5rem;
   }
 
-  .settings-nav__reset {
+  .settings-nav .btn--danger {
     width: 100%;
   }
 }
@@ -1330,28 +1553,6 @@ button {
   grid-template-columns: 1fr auto;
   gap: 0.45rem;
   align-items: stretch;
-}
-
-.settings-field__btn {
-  appearance: none;
-  border: 1px solid var(--line);
-  background: var(--paper);
-  color: var(--ink);
-  border-radius: 3px;
-  padding: 0.45rem 0.7rem;
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  white-space: nowrap;
-}
-
-.settings-field__btn:hover:not(:disabled) {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
-.settings-field__btn:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
 }
 
 .settings-field--row {
@@ -1394,28 +1595,6 @@ button {
 
 .settings-status-row__label {
   margin: 0;
-}
-
-.settings-status-row__remove {
-  appearance: none;
-  border: 0;
-  background: transparent;
-  color: var(--ink-muted);
-  font-size: 1.1rem;
-  line-height: 1;
-  padding: 0.25rem 0.4rem;
-  border-radius: 2px;
-  cursor: pointer;
-}
-
-.settings-status-row__remove:hover:not(:disabled) {
-  color: var(--danger);
-  background: color-mix(in srgb, var(--danger) 12%, transparent);
-}
-
-.settings-status-row__remove:disabled {
-  opacity: 0.35;
-  cursor: not-allowed;
 }
 
 .settings-status-actions {
@@ -1482,10 +1661,17 @@ button {
 }
 
 .settings-field__hint {
-  margin: -0.35rem 0 0.75rem;
+  margin: 0 0 0.75rem;
   font-size: 0.78rem;
   line-height: 1.4;
   color: var(--ink-muted);
+}
+
+/* Tighten only when a hint follows a field label/control — not section lead-ins */
+.settings-field__label + .settings-field__hint,
+.settings-field__control + .settings-field__hint,
+.font-picker + .settings-field__hint {
+  margin-top: -0.35rem;
 }
 
 .settings-field__hint code {
@@ -1580,7 +1766,6 @@ select.settings-field__control {
   background: var(--paper);
   border: 1px solid var(--line);
   border-radius: 3px;
-  box-shadow: 0 10px 28px color-mix(in srgb, #000 18%, transparent);
 }
 
 .font-picker__header {

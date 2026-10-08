@@ -32,11 +32,8 @@ export function EmptyItemFocusPlugin(): null {
       if (!itemEl || !root.contains(itemEl)) return;
 
       // Click landed on real editable content — let Lexical handle it.
-      if (
-        target !== itemEl &&
-        !target.classList.contains('outline-bullet') &&
-        !target.classList.contains('outline-item')
-      ) {
+      // Bullet/kind label are pseudo-elements (clicks hit .outline-item).
+      if (target !== itemEl) {
         const tag = target.tagName;
         if (tag !== 'BR') return;
       }

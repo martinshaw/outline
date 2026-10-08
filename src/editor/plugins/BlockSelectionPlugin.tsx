@@ -2,6 +2,8 @@ import { useEffect, useRef } from 'react';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
 import {
   $getRoot,
+  $getSelection,
+  $isRangeSelection,
   CLICK_COMMAND,
   COMMAND_PRIORITY_HIGH,
   COMMAND_PRIORITY_LOW,
@@ -18,6 +20,7 @@ import {
 import {
   $collectOutlineItemsDFS,
   $findOutlineItemById,
+  $getOutlineItem,
   $getTopLevelBlockSelection,
   $relocateOutlineItems,
   rangeIdsBetween,
@@ -43,10 +46,10 @@ function isGutterClick(event: MouseEvent, dom: HTMLElement): boolean {
   ) {
     return false;
   }
-  if (event.target.closest('.outline-bullet')) return true;
   const rect = dom.getBoundingClientRect();
-  // Leading gutter (bullet + gap) before chip/text.
-  return event.clientX - rect.left < 28;
+  // Leading gutter (kind label + bullet + gap) before chip/text.
+  // Bullet/label are CSS pseudo-elements, so hit-test by x only.
+  return event.clientX - rect.left < 72;
 }
 
 function outlineIdFromTarget(target: EventTarget | null): string | null {
@@ -104,9 +107,30 @@ function hitTestDrop(
   return { id, place };
 }
 
+function isTypingKey(event: KeyboardEvent): boolean {
+  if (event.metaKey || event.ctrlKey || event.isComposing) return false;
+  // Keep block selection for indent / reorder / role shortcuts.
+  if (event.key === 'Tab') return false;
+  if (event.key === 'Escape') return false;
+  if (
+    event.shiftKey &&
+    (event.key === 'ArrowUp' || event.key === 'ArrowDown') &&
+    (event.metaKey || event.altKey || event.ctrlKey)
+  ) {
+    return false;
+  }
+  if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) return false;
+
+  if (event.key === 'Backspace' || event.key === 'Delete' || event.key === 'Enter') {
+    return true;
+  }
+  return event.key.length === 1;
+}
+
 /**
  * Block multi-select via an external id store + DOM classes.
- * Gutter drag selects; dragging an existing selection relocates it.
+ * Gutter drag selects; text ranges also select their items for dragging.
+ * Typing clears the block selection.
  */
 export function BlockSelectionPlugin(): null {
   const [editor] = useLexicalComposerContext();
@@ -121,9 +145,35 @@ export function BlockSelectionPlugin(): null {
   useEffect(() => {
     const paint = () => syncBlockSelectionDom(editor.getRootElement());
 
+    const syncFromTextSelection = () => {
+      editor.getEditorState().read(() => {
+        const selection = $getSelection();
+        if (!$isRangeSelection(selection) || selection.isCollapsed()) return;
+        const anchorItem = $getOutlineItem(selection.anchor.getNode());
+        const focusItem = $getOutlineItem(selection.focus.getNode());
+        if (!anchorItem || !focusItem) return;
+        const ordered = $collectOutlineItemsDFS($getRoot()).map((item) =>
+          item.getId(),
+        );
+        setBlockSelectedIds(
+          rangeIdsBetween(ordered, anchorItem.getId(), focusItem.getId()),
+        );
+      });
+    };
+
     const unsub = subscribeBlockSelection(paint);
-    const removeUpdate = editor.registerUpdateListener(() => {
-      queueMicrotask(paint);
+    const removeUpdate = editor.registerUpdateListener(({ tags }) => {
+      queueMicrotask(() => {
+        paint();
+        if (
+          tags.has('historic') ||
+          tags.has('load') ||
+          tags.has('block-selection')
+        ) {
+          return;
+        }
+        syncFromTextSelection();
+      });
     });
     paint();
 
@@ -143,6 +193,12 @@ export function BlockSelectionPlugin(): null {
     const applyRange = (fromId: string, toId: string) => {
       const ordered = readOrderedIds(editor);
       setBlockSelectedIds(rangeIdsBetween(ordered, fromId, toId));
+    };
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!isTypingKey(event)) return;
+      if (getBlockSelectedIds().size === 0) return;
+      clearBlockSelectedIds();
     };
 
     const onMouseDown = (event: MouseEvent) => {
@@ -286,17 +342,20 @@ export function BlockSelectionPlugin(): null {
 
     return mergeRegister(
       editor.registerRootListener((root, prev) => {
-        if (prev) prev.removeEventListener('mousedown', onMouseDown);
-        if (root) root.addEventListener('mousedown', onMouseDown);
+        if (prev) {
+          prev.removeEventListener('mousedown', onMouseDown);
+          prev.removeEventListener('keydown', onKeyDown);
+        }
+        if (root) {
+          root.addEventListener('mousedown', onMouseDown);
+          root.addEventListener('keydown', onKeyDown);
+        }
       }),
       editor.registerCommand(
         CLICK_COMMAND,
         (event: MouseEvent) => {
           const dom = findOutlineDom(event.target);
-          if (!dom) {
-            if (mode.current === 'idle') clearBlockSelectedIds();
-            return false;
-          }
+          if (!dom) return false;
 
           if (isGutterClick(event, dom) || event.altKey) {
             return true;
@@ -309,7 +368,7 @@ export function BlockSelectionPlugin(): null {
             return true;
           }
 
-          if (mode.current === 'idle') clearBlockSelectedIds();
+          // Keep block selection from text ranges until the user types (or Esc).
           return false;
         },
         COMMAND_PRIORITY_LOW,

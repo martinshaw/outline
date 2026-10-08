@@ -21,6 +21,7 @@ import { LoadDocumentPlugin } from './plugins/LoadDocumentPlugin';
 import { ParagraphTransformPlugin } from './plugins/ParagraphTransformPlugin';
 import { EmptyItemFocusPlugin } from './plugins/EmptyItemFocusPlugin';
 import { MarkdownHeadingPlugin } from './plugins/MarkdownHeadingPlugin';
+import { EditorFocusPlugin } from './plugins/EditorFocusPlugin';
 
 type Props = {
   date: string;
@@ -76,6 +77,7 @@ export const OutlineEditor = memo(function OutlineEditor({
           ErrorBoundary={LexicalErrorBoundary}
         />
         <HistoryPlugin />
+        <EditorFocusPlugin />
         <LoadDocumentPlugin document={document} />
         <ParagraphTransformPlugin />
         <OutlineStructurePlugin />

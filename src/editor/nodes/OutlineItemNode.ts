@@ -145,25 +145,21 @@ export class OutlineItemNode extends ElementNode {
   }
 
   /**
-   * Lexical children must follow chrome (bullet + optional chip) so the
-   * reconciler does not treat those nodes as unmanaged mutations.
+   * Lexical children insert *before* the optional status chip so the first
+   * DOM child is editable (empty-row caret stays on the text line). Bullet /
+   * kind label are CSS pseudo-elements for the same reason. Chip is excluded
+   * from reconciliation via withBefore and painted in the gutter with CSS.
    */
   getDOMSlot(element: HTMLElement): ElementDOMSlot {
     const slot = super.getDOMSlot(element);
     const host = element as HTMLElement & {
-      __outlineBullet?: HTMLElement | null;
       __outlineStatusChip?: HTMLElement | null;
     };
     const chip =
       host.__outlineStatusChip?.isConnected
         ? host.__outlineStatusChip
         : element.querySelector(':scope > .outline-status-chip');
-    const bullet =
-      host.__outlineBullet?.isConnected
-        ? host.__outlineBullet
-        : element.querySelector(':scope > .outline-bullet');
-    const after = chip ?? bullet;
-    return after ? slot.withAfter(after) : slot;
+    return chip ? slot.withBefore(chip) : slot;
   }
 
   private applyDomAttrs(dom: HTMLElement): void {
@@ -177,27 +173,21 @@ export class OutlineItemNode extends ElementNode {
     }
     if (this.__status) dom.setAttribute('data-status', this.__status);
     else dom.removeAttribute('data-status');
+    const labelText = kindLabelFor(this.__kind, this.__headingLevel);
+    if (labelText) dom.setAttribute('data-kind-label', labelText);
+    else dom.removeAttribute('data-kind-label');
     this.syncChrome(dom);
   }
 
   private syncChrome(dom: HTMLElement): void {
     const host = dom as HTMLElement & {
-      __outlineBullet?: HTMLElement | null;
       __outlineStatusChip?: HTMLButtonElement | null;
     };
 
-    let bullet =
-      host.__outlineBullet?.isConnected
-        ? host.__outlineBullet
-        : dom.querySelector<HTMLElement>(':scope > .outline-bullet');
-    if (!bullet) {
-      bullet = document.createElement('span');
-      bullet.className = 'outline-bullet';
-      bullet.contentEditable = 'false';
-      bullet.setAttribute('aria-hidden', 'true');
-      dom.insertBefore(bullet, dom.firstChild);
-    }
-    host.__outlineBullet = bullet;
+    // Drop legacy DOM chrome (bullet/label spans) if present from older builds.
+    dom
+      .querySelectorAll(':scope > .outline-bullet, :scope > .outline-kind-label')
+      .forEach((el) => el.remove());
 
     let chip =
       host.__outlineStatusChip?.isConnected
@@ -207,6 +197,7 @@ export class OutlineItemNode extends ElementNode {
     if (this.__kind !== 'project' && this.__kind !== 'task') {
       chip?.remove();
       host.__outlineStatusChip = null;
+      dom.style.removeProperty('--outline-chip-indent');
       return;
     }
 
@@ -218,9 +209,9 @@ export class OutlineItemNode extends ElementNode {
       chip.tabIndex = -1;
       chip.setAttribute('aria-haspopup', 'listbox');
       chip.setAttribute('aria-expanded', 'false');
-      bullet.insertAdjacentElement('afterend', chip);
-    } else if (chip.previousElementSibling !== bullet) {
-      bullet.insertAdjacentElement('afterend', chip);
+      dom.appendChild(chip);
+    } else if (chip.parentElement !== dom) {
+      dom.appendChild(chip);
     }
     host.__outlineStatusChip = chip;
 
@@ -232,6 +223,18 @@ export class OutlineItemNode extends ElementNode {
       chip.setAttribute('aria-label', `Status: ${status.label}`);
     }
     chip.style.setProperty('--status-color', status.color);
+    // Reserve content indent for the absolutely positioned chip.
+    dom.style.setProperty(
+      '--outline-chip-indent',
+      `${Math.max(2.6, status.label.length * 0.42 + 0.85)}em`,
+    );
+    requestAnimationFrame(() => {
+      if (!chip?.isConnected || !dom.isConnected) return;
+      const w = chip.getBoundingClientRect().width;
+      if (w > 0) {
+        dom.style.setProperty('--outline-chip-indent', `${Math.ceil(w)}px`);
+      }
+    });
   }
 
   private buildClassName(): string {
@@ -301,6 +304,19 @@ export class OutlineItemNode extends ElementNode {
   extractWithChild(): boolean {
     return false;
   }
+}
+
+function kindLabelFor(
+  kind: ItemKind,
+  headingLevel: HeadingLevel | null,
+): string | null {
+  if (kind === 'heading') {
+    const level = headingLevel && headingLevel >= 1 && headingLevel <= 6 ? headingLevel : 1;
+    return `H${level}`;
+  }
+  if (kind === 'project') return 'Project';
+  if (kind === 'task') return 'Task';
+  return null;
 }
 
 function convertOutlineElement(domNode: HTMLElement): DOMConversionOutput {
