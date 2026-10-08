@@ -12,6 +12,7 @@ import {
 } from '../settings/settingsStore';
 import {
   BACKUP_MODE_OPTIONS,
+  DEFAULT_STATUSES,
   FONT_SIZE_DEFAULT,
   FONT_SIZE_MAX,
   FONT_SIZE_MIN,
@@ -20,6 +21,7 @@ import {
   THEME_OPTIONS,
   type AppSettings,
   type BackupMode,
+  type StatusDef,
   type ThemeId,
 } from '../settings/types';
 import { FontPicker, type FontPickerValue } from './FontPicker';
@@ -29,13 +31,21 @@ type Props = {
   onClose: () => void;
 };
 
-type SettingsSectionId = 'editor' | 'appearance' | 'backups' | 'saving';
+type SettingsSectionId =
+  | 'editor'
+  | 'appearance'
+  | 'statuses'
+  | 'backups'
+  | 'saving'
+  | 'developer';
 
 const SECTIONS: { id: SettingsSectionId; label: string }[] = [
   { id: 'editor', label: 'Editor' },
   { id: 'appearance', label: 'Appearance' },
+  { id: 'statuses', label: 'Statuses' },
   { id: 'backups', label: 'Backups' },
   { id: 'saving', label: 'Saving' },
+  { id: 'developer', label: 'Developer' },
 ];
 
 function fontPickerValue(settings: AppSettings): FontPickerValue {
@@ -131,6 +141,30 @@ export function SettingsDialog({ open, onClose }: Props) {
       return;
     }
     setSettings({ systemFontFamily: next.family });
+  };
+
+  const updateStatus = (index: number, patch: Partial<StatusDef>) => {
+    const next = settings.statuses.map((s, i) =>
+      i === index ? { ...s, ...patch } : s,
+    );
+    setSettings({ statuses: next });
+  };
+
+  const removeStatus = (index: number) => {
+    if (settings.statuses.length <= 1) return;
+    setSettings({
+      statuses: settings.statuses.filter((_, i) => i !== index),
+    });
+  };
+
+  const addStatus = () => {
+    const n = settings.statuses.length + 1;
+    setSettings({
+      statuses: [
+        ...settings.statuses,
+        { id: `status-${n}`, label: `Status ${n}`, color: '#6b7280' },
+      ],
+    });
   };
 
   return (
@@ -289,6 +323,72 @@ export function SettingsDialog({ open, onClose }: Props) {
               </section>
             )}
 
+            {section === 'statuses' && (
+              <section className="settings-section" aria-label="Statuses">
+                <p className="settings-field__hint">
+                  Used for project and task chips. ⌘/Ctrl+Enter cycles through
+                  this list. First status is the default for new projects/tasks.
+                </p>
+                <ul className="settings-status-list">
+                  {settings.statuses.map((status, index) => (
+                    <li key={status.id} className="settings-status-row">
+                      <input
+                        type="color"
+                        className="settings-status-row__color"
+                        value={
+                          /^#[0-9a-fA-F]{6}$/.test(status.color)
+                            ? status.color
+                            : '#6b7280'
+                        }
+                        aria-label={`Color for ${status.label}`}
+                        onChange={(e) =>
+                          updateStatus(index, { color: e.target.value })
+                        }
+                      />
+                      <input
+                        className="settings-field__control settings-status-row__label"
+                        type="text"
+                        value={status.label}
+                        aria-label="Status label"
+                        onChange={(e) =>
+                          updateStatus(index, { label: e.target.value })
+                        }
+                      />
+                      <button
+                        type="button"
+                        className="settings-status-row__remove"
+                        disabled={settings.statuses.length <= 1}
+                        aria-label={`Remove ${status.label}`}
+                        onClick={() => removeStatus(index)}
+                      >
+                        ×
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                <div className="settings-status-actions">
+                  <button
+                    type="button"
+                    className="settings-field__btn"
+                    onClick={addStatus}
+                  >
+                    Add status
+                  </button>
+                  <button
+                    type="button"
+                    className="settings-field__btn"
+                    onClick={() =>
+                      setSettings({
+                        statuses: DEFAULT_STATUSES.map((s) => ({ ...s })),
+                      })
+                    }
+                  >
+                    Reset list
+                  </button>
+                </div>
+              </section>
+            )}
+
             {section === 'backups' && (
               <section className="settings-section" aria-label="Backups">
                 <label className="settings-field">
@@ -356,6 +456,39 @@ export function SettingsDialog({ open, onClose }: Props) {
                       </option>
                     ))}
                   </select>
+                </label>
+              </section>
+            )}
+
+            {section === 'developer' && (
+              <section
+                className="settings-section settings-section--with-footer"
+                aria-label="Developer"
+              >
+                <div className="settings-section__body">
+                  <p className="settings-field__hint">
+                    Tools for diagnosing saves, selection, and editor
+                    performance. Nothing is collected or shown until you turn
+                    the panel on — similar to Safari’s Develop menu.
+                  </p>
+                  <p className="settings-field__hint">
+                    When enabled, a panel appears at the bottom-right with live
+                    stats and an event log (saves, navigation, network, editor
+                    updates). Turn it off to stop logging and hide the panel.
+                  </p>
+                </div>
+                <label className="settings-field settings-field--row settings-field--footer">
+                  <span className="settings-field__label">
+                    Show developer panel
+                  </span>
+                  <input
+                    type="checkbox"
+                    className="settings-field__checkbox"
+                    checked={settings.developerMode}
+                    onChange={(e) =>
+                      setSettings({ developerMode: e.target.checked })
+                    }
+                  />
                 </label>
               </section>
             )}

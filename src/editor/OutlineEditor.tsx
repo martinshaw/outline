@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { memo, useMemo } from 'react';
 import { LexicalComposer } from '@lexical/react/LexicalComposer';
 import { RichTextPlugin } from '@lexical/react/LexicalRichTextPlugin';
 import { ContentEditable } from '@lexical/react/LexicalContentEditable';
@@ -10,6 +10,7 @@ import { OutlineItemNode } from './nodes/OutlineItemNode';
 import { OutlineStructurePlugin } from './plugins/OutlineStructurePlugin';
 import { IndentReorderPlugin } from './plugins/IndentReorderPlugin';
 import { RolePlugin } from './plugins/RolePlugin';
+import { StatusChipPlugin } from './plugins/StatusChipPlugin';
 import { BlockSelectionPlugin } from './plugins/BlockSelectionPlugin';
 import { FormatPlugin } from './plugins/FormatPlugin';
 import { OutlineLinkPlugin } from './plugins/LinkPlugin';
@@ -18,6 +19,8 @@ import { PersistencePlugin } from './plugins/PersistencePlugin';
 import { NavigateToItemPlugin } from './plugins/NavigateToItemPlugin';
 import { LoadDocumentPlugin } from './plugins/LoadDocumentPlugin';
 import { ParagraphTransformPlugin } from './plugins/ParagraphTransformPlugin';
+import { EmptyItemFocusPlugin } from './plugins/EmptyItemFocusPlugin';
+import { MarkdownHeadingPlugin } from './plugins/MarkdownHeadingPlugin';
 
 type Props = {
   date: string;
@@ -33,7 +36,7 @@ function onError(error: Error): void {
   console.error(error);
 }
 
-export function OutlineEditor({
+export const OutlineEditor = memo(function OutlineEditor({
   date,
   document,
   enabled,
@@ -76,8 +79,11 @@ export function OutlineEditor({
         <LoadDocumentPlugin document={document} />
         <ParagraphTransformPlugin />
         <OutlineStructurePlugin />
+        <EmptyItemFocusPlugin />
+        <MarkdownHeadingPlugin />
         <IndentReorderPlugin />
         <RolePlugin />
+        <StatusChipPlugin />
         <BlockSelectionPlugin />
         <FormatPlugin />
         <OutlineAutoLinkPlugin />
@@ -95,4 +101,4 @@ export function OutlineEditor({
       </div>
     </LexicalComposer>
   );
-}
+});

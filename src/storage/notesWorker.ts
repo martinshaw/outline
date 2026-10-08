@@ -101,8 +101,6 @@ async function loadIndex(): Promise<{
 
 async function saveDay(doc: DayDocument): Promise<{
   status: 'saved' | 'deleted';
-  sidebar: SidebarDay[];
-  days: string[];
 }> {
   const notes = await getNotesDir();
   const name = `${doc.date}.json`;
@@ -112,23 +110,13 @@ async function saveDay(doc: DayDocument): Promise<{
     await writeJsonFile(notes, name, doc);
   }
   await rebuildManifest();
-  const index = await loadIndex();
-  return {
-    status: isDayEmpty(doc) ? 'deleted' : 'saved',
-    sidebar: index.sidebar,
-    days: index.days,
-  };
+  return { status: isDayEmpty(doc) ? 'deleted' : 'saved' };
 }
 
-async function deleteDay(date: string): Promise<{
-  sidebar: SidebarDay[];
-  days: string[];
-}> {
+async function deleteDay(date: string): Promise<void> {
   const notes = await getNotesDir();
   await deleteFile(notes, `${date}.json`);
   await rebuildManifest();
-  const index = await loadIndex();
-  return { sidebar: index.sidebar, days: index.days };
 }
 
 async function handleRequest(msg: RequestMessage): Promise<unknown> {

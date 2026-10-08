@@ -11,7 +11,13 @@ import {
   $isAutoLinkNode,
   $isLinkNode,
 } from '@lexical/link';
-import type { DayDocument, InlineSegment, OutlineItem } from '../types';
+import { getDefaultStatusId } from '../settings/settingsStore';
+import type {
+  DayDocument,
+  HeadingLevel,
+  InlineSegment,
+  OutlineItem,
+} from '../types';
 import { createId } from '../utils/id';
 import {
   $createOutlineItemNode,
@@ -77,11 +83,19 @@ function contentNodesToSegments(nodes: LexicalNode[]): InlineSegment[] {
 
 function outlineItemToData(node: OutlineItemNode): OutlineItem {
   const children = node.getChildren();
-  const contentChildren = children.filter((c) => !$isOutlineItemNode(c));
-  const nested = children.filter($isOutlineItemNode);
+  const contentChildren: LexicalNode[] = [];
+  const nested: OutlineItemNode[] = [];
+  for (const child of children) {
+    if ($isOutlineItemNode(child)) nested.push(child);
+    else contentChildren.push(child);
+  }
+  const kind = node.getKind();
+  const headingLevel = node.getHeadingLevel();
   return {
     id: node.getId(),
-    kind: node.getKind(),
+    kind,
+    headingLevel: kind === 'heading' ? headingLevel : null,
+    status: kind === 'project' || kind === 'task' ? node.getStatus() : null,
     content: contentNodesToSegments(contentChildren),
     children: nested.map(outlineItemToData),
   };
@@ -119,7 +133,23 @@ function segmentsToNodes(segments: InlineSegment[]): LexicalNode[] {
 }
 
 function dataToOutlineItem(item: OutlineItem): OutlineItemNode {
-  const node = $createOutlineItemNode(item.id || createId(), item.kind);
+  const kind = item.kind;
+  const status =
+    kind === 'project' || kind === 'task'
+      ? (item.status ?? getDefaultStatusId())
+      : null;
+  const headingLevel: HeadingLevel | null =
+    kind === 'heading'
+      ? (item.headingLevel && item.headingLevel >= 1 && item.headingLevel <= 6
+          ? item.headingLevel
+          : 1)
+      : null;
+  const node = $createOutlineItemNode(
+    item.id || createId(),
+    kind,
+    status,
+    headingLevel,
+  );
   node.append(...segmentsToNodes(item.content));
   for (const child of item.children) {
     node.append(dataToOutlineItem(child));

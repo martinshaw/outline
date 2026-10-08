@@ -1,29 +1,62 @@
 # Outline
 
-**Version 0.5.0**
+**Version 0.6.0** · [Live demo](https://martinshaw.github.io/outline/) · [Repository](https://github.com/martinshaw/outline)
 
 Local-first chronological outline editor inspired by [LogSeq](https://logseq.com). Notes live in a folder on your computer via Chrome’s File System Access API — no account, no server, no sync backend.
 
 Built with [React](https://react.dev), [Lexical](https://lexical.dev), [Vite](https://vitejs.dev), and a Progressive Web App shell for offline use.
 
-**Live demo (GitHub Pages):** https://martinshaw.github.io/outline/
+---
+
+## Table of contents
+
+1. [Features](#features)
+2. [Requirements](#requirements)
+3. [Quick start](#quick-start)
+4. [Using the app](#using-the-app)
+   - [Daily notes](#daily-notes)
+   - [Sidebar](#sidebar)
+   - [Notes, projects, tasks, headings & status](#notes-projects-tasks-headings--status)
+   - [Outliner behavior](#outliner-behavior)
+   - [Links](#links)
+   - [Block selection](#block-selection)
+   - [Menu](#menu)
+   - [Settings](#settings)
+5. [Keyboard shortcuts](#keyboard-shortcuts)
+6. [Storage layout](#storage-layout)
+7. [Day document format](#day-document-format)
+8. [Settings file format](#settings-file-format)
+9. [Exports](#exports)
+10. [Offline & PWA](#offline--pwa)
+11. [Troubleshooting](#troubleshooting)
+12. [Tech stack](#tech-stack)
+13. [Scripts](#scripts)
+14. [Deploy (GitHub Pages)](#deploy-github-pages)
+15. [Contributing](#contributing)
+16. [License](#license)
 
 ---
 
 ## Features
 
-- **Daily notes** — one outline document per calendar day (`YYYY-MM-DD`)
-- **Nested outliner** — indent, outdent, and reorder blocks with LogSeq-style tree moves
-- **Projects & tasks** — mark blocks as projects; children under a project can be tasks
-- **Sidebar** — navigate days → projects → tasks; collapsible
-- **Rich text** — bold, italic, underline
-- **Links** — paste or type URLs; click to open; right-click to unlink; Backspace deletes the whole link
-- **Block selection** — gutter click/drag, Shift-extend, Alt-drag; bulk indent/move/export
-- **Exports** — day or selection as JSON, YAML, Markdown, plain text, or HTML
-- **Automatic backups** — notes touched on a given calendar day are snapshotted the next time you write today’s note
-- **Settings** — stored as `settings.json` in your notes folder (font, size, theme, backups, autosave)
-- **Dark mode** — system, light, or dark (configurable)
-- **Offline PWA** — app shell caches after first visit; notes stay on disk
+| Area | What you get |
+|------|----------------|
+| **Daily notes** | One outline document per calendar day (`YYYY-MM-DD`) |
+| **Nested outliner** | Indent, outdent, and reorder with LogSeq-style tree moves |
+| **Projects & tasks** | Promote blocks; tasks nest under projects |
+| **Status chips** | Inline coloured chips on projects/tasks; configurable statuses |
+| **Headings** | Markdown `#` … `######` + space → heading blocks (levels 1–6) |
+| **Sidebar** | Navigate days → projects → tasks; collapse state persisted |
+| **Rich text** | Bold, italic, underline |
+| **Links** | Paste/type URLs; click to open; unlink / whole-link delete |
+| **Block selection** | Gutter select, multi-select, drag to relocate at any level |
+| **Exports** | Day or selection as JSON, YAML, Markdown, text, or HTML |
+| **Backups** | Snapshot notes edited yesterday when you first write today |
+| **Settings** | Stored as `settings.json` in your workspace folder |
+| **Developer panel** | Optional bottom-right debug log (Settings → Developer) |
+| **Theme** | System, light, or dark |
+| **Fonts** | Built-in + searchable system fonts (Local Font Access) |
+| **Offline PWA** | App shell caches after first visit; data stays on disk |
 
 ---
 
@@ -35,7 +68,7 @@ Built with [React](https://react.dev), [Lexical](https://lexical.dev), [Vite](ht
 | **Secure context** | `http://localhost` or `https://` |
 | **Folder permission** | Read/write access to a directory you choose |
 
-Safari and Firefox are not supported for folder persistence.
+Safari and Firefox are **not** supported for folder persistence.
 
 ---
 
@@ -62,7 +95,13 @@ npm run build
 npm run preview
 ```
 
-Serve the `dist/` output over HTTPS (or localhost) if you host it yourself.
+For GitHub Pages asset paths:
+
+```bash
+npm run build:pages
+```
+
+Serve `dist/` over HTTPS (or localhost) if you host it yourself.
 
 ---
 
@@ -79,17 +118,28 @@ Serve the `dist/` output over HTTPS (or localhost) if you host it yourself.
 
 - Lists non-empty days (newest first), with projects and their tasks nested underneath.
 - Click a day, project, or task to jump there.
-- Toggle the sidebar with the ☰ button in the top bar (collapsed by default).
+- Toggle with ☰ in the top bar (collapsed by default; preference is saved in settings).
 
-### Projects and tasks
+### Notes, projects, tasks, headings & status
 
-| Kind | How you get it | Appearance |
-|------|----------------|------------|
-| **Note** | Default | Plain bullet |
-| **Project** | `⌘Enter` / `Ctrl+Enter` on a note | Distinct project styling |
-| **Task** | `⌘Enter` / `Ctrl+Enter` on a block **under** a project | Task styling |
+| Kind | How you get it | Marker |
+|------|----------------|--------|
+| **Note** | Default | Hollow circle |
+| **Heading** | Type `#` … `######` then space at the start of a block | Hollow circle + larger type |
+| **Project** | `⌘Enter` / `Ctrl+Enter` on a note/heading (not under a project) | Circle + **status chip** |
+| **Task** | `⌘Enter` / `Ctrl+Enter` on a note/heading **under** a project | Circle + **status chip** |
 
-Toggling again cycles back. Moving a task out from under any project demotes it to a note.
+On a **project** or **task**, `⌘Enter` / `Ctrl+Enter` **cycles status** (does not demote to a note). Backspace at the start of a **heading** demotes it to a note.
+
+Default statuses (editable in Settings → Statuses):
+
+1. Backlog  
+2. To do  
+3. In progress  
+4. Done  
+5. Archived  
+
+Click a status chip to open a dropdown and pick a status. The chosen status is stored on the item in the day JSON. Tasks keep their kind when moved outside a project.
 
 ### Outliner behavior
 
@@ -123,37 +173,39 @@ With a **block selection**, Tab, Shift+Tab, and move shortcuts apply to the whol
 | Triple-click | Select block |
 | `Esc` | Clear selection |
 
-Tasks keep their kind when moved outside a project (they no longer demote to notes).
-
-Selected blocks include their nested children for move/indent semantics where applicable. Selection is used for **Export selection**.
+Selected blocks include nested children for move/indent where applicable. Selection is used for **Export selection**.
 
 ### Menu
 
 Open **Menu** in the top bar:
 
-- **Change folder** — pick a different notes directory
-- **Insert test hierarchy** — sample nested outline for the active day (handy for trying moves)
-- **Keyboard shortcuts** — same as `?` or `⌘/` / `Ctrl+/`
-- **Settings…** — font, size, theme, backups, autosave
-- **Export day** / **Export selection** — JSON, YAML, Markdown, Text, or HTML download
+| Item | Purpose |
+|------|---------|
+| **Change folder** | Pick a different notes directory |
+| **Insert test hierarchy** | Sample nested outline for the active day |
+| **Keyboard shortcuts** | Same as `?` or `⌘/` / `Ctrl+/` |
+| **Settings…** | Font, theme, statuses, backups, autosave |
+| **Export day / selection** | JSON, YAML, Markdown, Text, or HTML |
 
-Errors (save failures, export with nothing selected, etc.) show as toasts.
+Errors (save failures, empty selection export, etc.) show as toasts.
 
 ### Settings
 
-Open **Menu → Settings…**. Preferences are saved as **`settings.json`** in the root of your chosen workspace folder (next to `notes/`), so they travel with your files — not in the browser.
+Open **Menu → Settings…**. Preferences are saved as **`settings.json`** in the root of your workspace folder (next to `notes/`), so they travel with your files — not in the browser.
 
-| Setting | Options |
+| Section | Options |
 |---------|---------|
-| **Font** | One dropdown: built-in presets, loaded system fonts, and **Add system fonts…** (Local Font Access) |
-| **Size** | Slider from 0.7–1.4rem (default 1.05rem in the middle) |
-| **Theme** | System, Light, Dark |
-| **Collapse sidebar** | Persisted; also toggled with ☰ in the top bar |
-| **When to backup** | On next day’s first write (default), or Off |
-| **Backup folder name** | Sibling of `notes/` (default `backups`) |
-| **Autosave delay** | 250 ms – 1.5 s |
+| **Editor → Font** | Built-in presets, loaded system fonts, **Add system fonts…** (Local Font Access); type to search |
+| **Editor → Size** | Slider 0.7–1.4rem (default **1.05rem** in the middle) |
+| **Appearance → Theme** | System, Light, Dark |
+| **Appearance → Collapse sidebar** | Also toggled with ☰ |
+| **Statuses** | Labels and colours for project/task chips; add / remove / reset list |
+| **Backups → When to backup** | On next day’s first write (default), or Off |
+| **Backups → Folder name** | Sibling of `notes/` (default `backups`) |
+| **Saving → Autosave delay** | 250 ms – 1.5 s |
+| **Developer → Show developer panel** | Bottom-right stats + event log (off by default; no data collected until enabled) |
 
-Use **Reset to defaults** to restore the built-in values.
+**Reset to defaults** (sidebar of the settings dialog) restores built-in values.
 
 ---
 
@@ -172,8 +224,8 @@ Press `?` or `⌘/` / `Ctrl+/` in the app for the same list.
 | `Shift+Tab` | Outdent (following siblings become children) |
 | `⌘⇧↑` / `⌘⇧↓` (macOS) | Move block or selection up / down |
 | `Alt+Shift+↑` / `Alt+Shift+↓` (Windows/Linux) | Move block or selection up / down |
-| `⌘Enter` / `Ctrl+Enter` | Toggle project (or task under a project) |
-| `Backspace` (at start) | Merge with previous or outdent |
+| `⌘Enter` / `Ctrl+Enter` | Promote note/heading → project/task; cycle status on project/task |
+| `Backspace` (at start) | Merge with previous or outdent; demote heading → note |
 | `Esc` | Clear block selection |
 
 ### Selection
@@ -184,6 +236,7 @@ Press `?` or `⌘/` / `Ctrl+/` in the app for the same list.
 | Drag gutter | Multi-select contiguous blocks |
 | `Shift`+click gutter | Extend selection |
 | `Alt`+drag | Multi-select without gutter |
+| Drag selection | Move selection between items (adopts that level) |
 | Triple-click | Select block |
 
 ### Formatting
@@ -193,6 +246,7 @@ Press `?` or `⌘/` / `Ctrl+/` in the app for the same list.
 | `⌘B` / `Ctrl+B` | Bold |
 | `⌘I` / `Ctrl+I` | Italic |
 | `⌘U` / `Ctrl+U` | Underline |
+| `#` … `######` then Space | Heading levels 1–6 |
 | Paste URL | Insert link |
 | Right-click link | Remove link |
 
@@ -202,6 +256,7 @@ Press `?` or `⌘/` / `Ctrl+/` in the app for the same list.
 |----------|--------|
 | `?` | Open keyboard shortcuts |
 | `⌘/` / `Ctrl+/` | Open keyboard shortcuts |
+| Menu | Settings, exports, folder… |
 | `Esc` | Close dialog / clear selection |
 
 ---
@@ -212,7 +267,7 @@ Everything stays inside the folder you grant:
 
 ```text
 your-folder/
-  settings.json           # app preferences (font, theme, backups, …)
+  settings.json           # app preferences (font, theme, statuses, backups, …)
   notes/
     2026-10-08.json       # one file per day with content
     manifest.json         # index of day keys (rebuilt on save)
@@ -225,16 +280,16 @@ your-folder/
 
 ### Saves
 
-- Edits debounce to disk as you work.
+- Edits debounce to disk as you work (delay configurable).
 - Saving an empty day **deletes** that day’s JSON file and updates the manifest.
 - The directory handle is stored in the browser (IndexedDB via `idb-keyval`); note content and settings live only in your folder.
 
 ### Backups
 
-1. Every successful save (or delete) records that **note date** under **today’s calendar date** in `backups/change-log.json`.
-2. The first time you write on a **new day’s** note (`today`’s file), the app copies every note that was changed on earlier calendar days into `backups/<change-day>/`.
+1. Every successful save (or delete) records that **note date** under **today’s calendar date** in `backups/change-log.json` (when backups are enabled).
+2. The first time you write on a **new day’s** note, the app copies every note that was changed on earlier calendar days into `backups/<change-day>/`.
 3. Those change-log entries are then cleared. Skipped days still flush when you eventually write today’s note.
-4. Backup files are plain copies for your own recovery; the sidebar and editor **only** read `notes/`.
+4. Backup files are plain copies for recovery; the sidebar and editor **only** read `notes/`.
 
 ---
 
@@ -250,6 +305,7 @@ Each `notes/YYYY-MM-DD.json` file looks like:
     {
       "id": "…",
       "kind": "project",
+      "status": "in-progress",
       "content": [
         { "type": "text", "text": "Ship outline", "format": { "bold": true } },
         { "type": "link", "url": "https://example.com", "text": "spec" }
@@ -258,6 +314,7 @@ Each `notes/YYYY-MM-DD.json` file looks like:
         {
           "id": "…",
           "kind": "task",
+          "status": "todo",
           "content": [{ "type": "text", "text": "Write README" }],
           "children": []
         }
@@ -272,11 +329,59 @@ Each `notes/YYYY-MM-DD.json` file looks like:
 | `version` | Schema version (`1`) |
 | `date` | `YYYY-MM-DD` (local calendar) |
 | `items` | Top-level outline nodes |
-| `kind` | `"note"` \| `"project"` \| `"task"` |
+| `kind` | `"note"` \| `"project"` \| `"task"` \| `"heading"` |
+| `headingLevel` | `1`–`6` when `kind` is `"heading"`; otherwise omitted/`null` |
+| `status` | Status id for project/task (from `settings.json` statuses); omitted/`null` for notes/headings |
 | `content` | Inline segments: plain/formatted text or links |
 | `children` | Nested outline items |
 
 `manifest.json` lists known day keys and is regenerated whenever days are saved or removed.
+
+---
+
+## Settings file format
+
+`settings.json` at the workspace root (created when you open a folder):
+
+```json
+{
+  "version": 1,
+  "font": "source-serif",
+  "systemFontFamily": null,
+  "fontSize": 1.05,
+  "theme": "system",
+  "sidebarCollapsed": true,
+  "statuses": [
+    { "id": "backlog", "label": "Backlog", "color": "#6b7280" },
+    { "id": "todo", "label": "To do", "color": "#3b82f6" },
+    { "id": "in-progress", "label": "In progress", "color": "#d97706" },
+    { "id": "done", "label": "Done", "color": "#16a34a" },
+    { "id": "archived", "label": "Archived", "color": "#9ca3af" }
+  ],
+  "backupMode": "on-next-day-write",
+  "backupDirectory": "backups",
+  "saveDebounceMs": 400,
+  "developerMode": false
+}
+```
+
+Until a folder is opened, the app uses in-memory defaults. Opening a folder loads (or creates) this file.
+
+---
+
+## Exports
+
+From **Menu**, export the **whole day** or the **current block selection**:
+
+| Format | Extension | Notes |
+|--------|-----------|--------|
+| JSON | `.json` | Same shape as day documents |
+| YAML | `.yml` | Same data as JSON |
+| Markdown | `.md` | Nested list; kinds/statuses as prefixes |
+| Text | `.txt` | Plain indented outline |
+| HTML | `.html` | Minimal standalone page |
+
+Selection export requires at least one block selected.
 
 ---
 
@@ -286,7 +391,7 @@ Each `notes/YYYY-MM-DD.json` file looks like:
 - **Notes still require** access to your chosen folder. Offline editing works once permission is granted and the handle is available.
 - Returning later, Chrome may ask you to re-confirm folder access — use the gate screen or **Change folder**.
 
-PWA install (optional): Chrome → install icon / “Install Outline” for a standalone window.
+Optional install: Chrome → install icon / “Install Outline” for a standalone window.
 
 ---
 
@@ -297,9 +402,12 @@ PWA install (optional): Chrome → install icon / “Install Outline” for a st
 | **Open notes folder** does nothing | Use Chrome on desktop; ensure `localhost` or HTTPS |
 | Stuck on permission screen | Click the prompt; check the site isn’t blocked from file access |
 | Changes not on disk | Watch for error toasts; confirm the folder still exists and is writable |
-| Old day missing from sidebar | Empty days are deleted; check `backups/` if you need a prior snapshot |
+| Settings reset after reopening | Confirm `settings.json` exists in the workspace root and is writable |
+| Old day missing from sidebar | Empty days are deleted; check `backups/` for a prior snapshot |
+| System fonts missing | Desktop Chrome/Edge only; choose **Add system fonts…** and allow permission |
 | Links / shortcuts feel wrong | Open **Keyboard shortcuts** (`?`) for the current platform bindings |
 | Offline shell but no notes | Re-grant folder permission after reconnecting |
+| GitHub Pages 404 on assets | Site must be built with `build:pages` (`base: /outline/`) |
 
 ---
 
@@ -314,30 +422,52 @@ PWA install (optional): Chrome → install icon / “Install Outline” for a st
 | Folder handle | File System Access API + `idb-keyval` |
 | Language | TypeScript |
 
-Notable source areas:
+### Source map
 
 | Path | Role |
 |------|------|
-| `src/editor/` | Lexical editor, outline nodes, plugins |
-| `src/storage/` | Folder I/O, saves, backups, settings.json, change log |
-| `src/settings/` | Preferences model + Local Font Access |
+| `src/editor/` | Lexical editor, outline nodes, plugins (indent, selection, status chips, links) |
+| `src/storage/` | Folder I/O, saves, backups, `settings.json`, change log |
+| `src/settings/` | Preferences model, normalisation, Local Font Access |
 | `src/sidebar/` | Day / project / task navigation |
-| `src/utils/export.ts` | Export serializers (JSON, YAML, Markdown, text, HTML) |
+| `src/components/` | Menu, settings/shortcuts dialogs, toasts, font picker |
+| `src/utils/export.ts` | Export serializers |
 | `src/types.ts` | Shared document types |
+| `.github/workflows/` | GitHub Pages deploy |
+
+---
+
+## Scripts
+
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Vite dev server |
+| `npm run build` | Typecheck + production build (`base: /`) |
+| `npm run build:pages` | Typecheck + build for GitHub Pages (`base: /outline/`) |
+| `npm run preview` | Preview the production build locally |
 
 ---
 
 ## Deploy (GitHub Pages)
 
-CI builds and deploys on pushes to `main` and on version tags (`v*`):
+CI builds and deploys on pushes to `main` / `master`, on version tags (`v*`), and via **workflow_dispatch**:
 
 - Workflow: [`.github/workflows/deploy-pages.yml`](.github/workflows/deploy-pages.yml)
 - Site: https://martinshaw.github.io/outline/
 
-Enable **Settings → Pages → GitHub Actions** as the source after the first successful workflow run.
+Enable **Settings → Pages → GitHub Actions** as the source. The `github-pages` environment should allow the `master` (or `main`) branch and optionally `v*` tags.
+
+---
+
+## Contributing
+
+1. Fork or clone https://github.com/martinshaw/outline  
+2. `npm install` && `npm run dev`  
+3. Prefer small PRs against `master`  
+4. Run `npm run build` (or `build:pages` if touching deploy/base paths) before opening a PR  
 
 ---
 
 ## License
 
-MIT — see repository settings / add a `LICENSE` file if desired.
+MIT — see the repository for license details.

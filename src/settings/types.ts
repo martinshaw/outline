@@ -11,11 +11,25 @@ export type ThemeId = 'system' | 'light' | 'dark';
 
 export type BackupMode = 'on-next-day-write' | 'off';
 
+export type StatusDef = {
+  id: string;
+  label: string;
+  color: string;
+};
+
 /** Editor font size in rem. Default sits in the middle of the slider range. */
 export const FONT_SIZE_MIN = 0.7;
 export const FONT_SIZE_MAX = 1.4;
 export const FONT_SIZE_STEP = 0.05;
 export const FONT_SIZE_DEFAULT = 1.05;
+
+export const DEFAULT_STATUSES: StatusDef[] = [
+  { id: 'backlog', label: 'Backlog', color: '#6b7280' },
+  { id: 'todo', label: 'To do', color: '#3b82f6' },
+  { id: 'in-progress', label: 'In progress', color: '#d97706' },
+  { id: 'done', label: 'Done', color: '#16a34a' },
+  { id: 'archived', label: 'Archived', color: '#9ca3af' },
+];
 
 export type AppSettings = {
   version: 1;
@@ -30,11 +44,18 @@ export type AppSettings = {
   theme: ThemeId;
   /** Whether the notes sidebar starts collapsed. */
   sidebarCollapsed: boolean;
+  /** Configurable project/task statuses (chips + ⌘Enter cycle). */
+  statuses: StatusDef[];
   backupMode: BackupMode;
   /** Sibling directory name under the workspace root (letters, numbers, hyphens). */
   backupDirectory: string;
   /** Debounced autosave delay in milliseconds. */
   saveDebounceMs: number;
+  /**
+   * When true, show the on-screen developer panel and collect debug logs.
+   * Off by default (Safari Develop-menu style).
+   */
+  developerMode: boolean;
 };
 
 export const FONT_OPTIONS: {
@@ -117,7 +138,9 @@ export const DEFAULT_SETTINGS: AppSettings = {
   fontSize: FONT_SIZE_DEFAULT,
   theme: 'system',
   sidebarCollapsed: true,
+  statuses: DEFAULT_STATUSES.map((s) => ({ ...s })),
   backupMode: 'on-next-day-write',
   backupDirectory: 'backups',
   saveDebounceMs: 400,
+  developerMode: false,
 };

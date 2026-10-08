@@ -59,14 +59,29 @@ export function FolderGate({
         )}
 
         {needsPermission && folderName ? (
-          <button
-            type="button"
-            className="gate__btn"
-            onClick={onGrantPermission}
-            disabled={busy}
-          >
-            {busy ? 'Opening…' : `Allow access to “${folderName}”`}
-          </button>
+          <>
+            <p className="gate__hint">
+              Chrome remembered folder <strong>{folderName}</strong>. Allow
+              access to continue — choose “Allow on every visit” to skip this
+              next time.
+            </p>
+            <button
+              type="button"
+              className="gate__btn"
+              onClick={onGrantPermission}
+              disabled={busy}
+            >
+              {busy ? 'Opening…' : `Allow access to “${folderName}”`}
+            </button>
+            <button
+              type="button"
+              className="gate__btn gate__btn--secondary"
+              onClick={onOpenFolder}
+              disabled={!supportsFs || busy}
+            >
+              Choose a different folder
+            </button>
+          </>
         ) : (
           <button
             type="button"

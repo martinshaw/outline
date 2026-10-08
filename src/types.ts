@@ -1,4 +1,7 @@
-export type ItemKind = 'note' | 'project' | 'task';
+export type ItemKind = 'note' | 'project' | 'task' | 'heading';
+
+/** Markdown-style heading depth (`#` … `######`). */
+export type HeadingLevel = 1 | 2 | 3 | 4 | 5 | 6;
 
 export type InlineMark = {
   bold?: boolean;
@@ -13,6 +16,10 @@ export type InlineSegment =
 export type OutlineItem = {
   id: string;
   kind: ItemKind;
+  /** Present when kind is `heading` (1–6 from `#` … `######`). */
+  headingLevel?: HeadingLevel | null;
+  /** Status id for project/task items (from settings.statuses). */
+  status?: string | null;
   content: InlineSegment[];
   children: OutlineItem[];
 };

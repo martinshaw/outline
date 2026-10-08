@@ -183,6 +183,12 @@ function $handleBackspace(): boolean {
   const item = $getSelectedOutlineItem();
   if (!item || !$isAtStartOfItem(item)) return false;
 
+  // Backspace at start of a heading demotes it to a normal note.
+  if (item.getKind() === 'heading') {
+    item.setHeading(null);
+    return true;
+  }
+
   const parent = $getParentOutlineItem(item);
   if (parent && $isItemTextEmpty(item)) {
     return $outdentItem(item);
@@ -260,19 +266,22 @@ export function OutlineStructurePlugin(): null {
       editor.registerUpdateListener(({ editorState }) => {
         editorState.read(() => {
           const root = $getRoot();
-          const items = root.getChildren().filter($isOutlineItemNode);
-          if (items.length === 0) {
-            queueMicrotask(() => {
-              editor.update(() => {
-                const r = $getRoot();
-                if (r.getChildren().filter($isOutlineItemNode).length === 0) {
-                  const node = $createOutlineItemNode(createId(), 'note');
-                  node.append($createTextNode(''));
-                  r.append(node);
-                }
-              });
-            });
+          // Fast path: most updates leave at least one child.
+          if (root.getChildrenSize() > 0) {
+            const first = root.getFirstChild();
+            if ($isOutlineItemNode(first) || root.getChildren().some($isOutlineItemNode)) {
+              return;
+            }
           }
+          queueMicrotask(() => {
+            editor.update(() => {
+              const r = $getRoot();
+              if (r.getChildren().some($isOutlineItemNode)) return;
+              const node = $createOutlineItemNode(createId(), 'note');
+              node.append($createTextNode(''));
+              r.append(node);
+            });
+          });
         });
       }),
     );

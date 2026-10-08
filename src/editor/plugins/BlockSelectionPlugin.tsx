@@ -36,7 +36,16 @@ function findOutlineDom(target: EventTarget | null): HTMLElement | null {
 }
 
 function isGutterClick(event: MouseEvent, dom: HTMLElement): boolean {
+  if (!(event.target instanceof Element)) return false;
+  if (
+    event.target.closest('.outline-status-chip') ||
+    event.target.closest('.outline-status-menu')
+  ) {
+    return false;
+  }
+  if (event.target.closest('.outline-bullet')) return true;
   const rect = dom.getBoundingClientRect();
+  // Leading gutter (bullet + gap) before chip/text.
   return event.clientX - rect.left < 28;
 }
 

@@ -69,9 +69,19 @@ function segmentsToHtml(segments: InlineSegment[]): string {
 }
 
 function kindPrefix(item: OutlineItem): string {
-  if (item.kind === 'project') return '[project] ';
-  if (item.kind === 'task') return '[task] ';
+  if (item.kind === 'project' || item.kind === 'task') {
+    const status = item.status ? `:${item.status}` : '';
+    return `[${item.kind}${status}] `;
+  }
   return '';
+}
+
+function headingMarks(item: OutlineItem): string {
+  if (item.kind !== 'heading') return '';
+  const level = item.headingLevel && item.headingLevel >= 1 && item.headingLevel <= 6
+    ? item.headingLevel
+    : 1;
+  return `${'#'.repeat(level)} `;
 }
 
 function toMarkdown(items: OutlineItem[], depth = 0): string {
@@ -79,7 +89,11 @@ function toMarkdown(items: OutlineItem[], depth = 0): string {
   const lines: string[] = [];
   for (const item of items) {
     const body = segmentsToMarkdown(item.content) || '';
-    lines.push(`${pad}- ${kindPrefix(item)}${body}`);
+    if (item.kind === 'heading') {
+      lines.push(`${pad}- ${headingMarks(item)}${body}`);
+    } else {
+      lines.push(`${pad}- ${kindPrefix(item)}${body}`);
+    }
     if (item.children.length) lines.push(toMarkdown(item.children, depth + 1));
   }
   return lines.join('\n');
@@ -90,7 +104,7 @@ function toPlainText(items: OutlineItem[], depth = 0): string {
   const lines: string[] = [];
   for (const item of items) {
     const body = segmentsToPlainText(item.content);
-    lines.push(`${pad}${kindPrefix(item)}${body}`);
+    lines.push(`${pad}${kindPrefix(item)}${headingMarks(item)}${body}`);
     if (item.children.length) lines.push(toPlainText(item.children, depth + 1));
   }
   return lines.join('\n');
@@ -105,8 +119,16 @@ function toHtmlList(items: OutlineItem[]): string {
         item.kind !== 'note'
           ? ` data-kind="${escapeHtml(item.kind)}"`
           : '';
+      const heading =
+        item.kind === 'heading' && item.headingLevel
+          ? ` data-heading-level="${item.headingLevel}"`
+          : '';
       const kids = toHtmlList(item.children);
-      return `<li${kind}>${body}${kids}</li>`;
+      const labeled =
+        item.kind === 'heading' && item.headingLevel
+          ? `<h${item.headingLevel}>${body}</h${item.headingLevel}>`
+          : body;
+      return `<li${kind}${heading}>${labeled}${kids}</li>`;
     })
     .join('\n');
   return `<ul>\n${lis}\n</ul>`;
