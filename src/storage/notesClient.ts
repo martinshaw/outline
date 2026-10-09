@@ -1,4 +1,9 @@
 import {
+  configureEntityPersistence,
+  getEntityCatalog,
+  hydrateEntities,
+} from '../entities/entityStore';
+import {
   configureSettingsPersistence,
   getSettings,
   hydrateSettings,
@@ -12,8 +17,10 @@ import {
   listDirectoryEntries,
   loadAllDays,
   loadAppSettings,
+  loadEntityCatalog,
   loadDay as fsLoadDay,
   saveAppSettings,
+  saveEntityCatalog,
   saveDay as fsSaveDay,
   type FsEntry,
 } from './fs';
@@ -37,6 +44,15 @@ class NotesClient {
     // Ensure settings.json exists in the workspace
     if (!fromDisk) {
       await saveAppSettings(handle, getSettings());
+    }
+
+    const entitiesFromDisk = await loadEntityCatalog(handle);
+    hydrateEntities(entitiesFromDisk);
+    configureEntityPersistence(async (catalog) => {
+      if (this.root) await saveEntityCatalog(this.root, catalog);
+    });
+    if (!entitiesFromDisk) {
+      await saveEntityCatalog(handle, getEntityCatalog());
     }
 
     return { name: await getFolderName(handle) };

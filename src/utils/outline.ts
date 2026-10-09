@@ -3,7 +3,7 @@ import type {
   InlineSegment,
   OutlineItem,
   SidebarDay,
-  SidebarProject,
+  SidebarTask,
 } from '../types';
 import { formatDayLabel } from './date';
 
@@ -28,25 +28,25 @@ export function isDayEmpty(doc: DayDocument): boolean {
 }
 
 export function extractSidebarDay(doc: DayDocument): SidebarDay {
-  const projects: SidebarProject[] = [];
+  const tasks: SidebarTask[] = [];
 
   const visit = (items: OutlineItem[]) => {
     for (const item of items) {
-      if (item.kind === 'project') {
-        const tasks: { id: string; title: string }[] = [];
-        const collectTasks = (children: OutlineItem[]) => {
+      if (item.kind === 'task') {
+        const subtasks: { id: string; title: string }[] = [];
+        const collectSubtasks = (children: OutlineItem[]) => {
           for (const child of children) {
-            if (child.kind === 'task') {
-              tasks.push({ id: child.id, title: itemTitle(child) });
+            if (child.kind === 'subtask') {
+              subtasks.push({ id: child.id, title: itemTitle(child) });
             }
-            collectTasks(child.children);
+            collectSubtasks(child.children);
           }
         };
-        collectTasks(item.children);
-        projects.push({
+        collectSubtasks(item.children);
+        tasks.push({
           id: item.id,
           title: itemTitle(item),
-          tasks,
+          subtasks,
         });
       }
       visit(item.children);
@@ -58,23 +58,23 @@ export function extractSidebarDay(doc: DayDocument): SidebarDay {
   return {
     date: doc.date,
     label: formatDayLabel(doc.date),
-    projects,
+    tasks,
   };
 }
 
 /** True when sidebar projection for a day is unchanged (skip React updates). */
 export function sidebarDaysEqual(a: SidebarDay, b: SidebarDay): boolean {
   if (a.date !== b.date || a.label !== b.label) return false;
-  if (a.projects.length !== b.projects.length) return false;
-  for (let i = 0; i < a.projects.length; i++) {
-    const pa = a.projects[i];
-    const pb = b.projects[i];
-    if (pa.id !== pb.id || pa.title !== pb.title) return false;
-    if (pa.tasks.length !== pb.tasks.length) return false;
-    for (let j = 0; j < pa.tasks.length; j++) {
+  if (a.tasks.length !== b.tasks.length) return false;
+  for (let i = 0; i < a.tasks.length; i++) {
+    const ta = a.tasks[i];
+    const tb = b.tasks[i];
+    if (ta.id !== tb.id || ta.title !== tb.title) return false;
+    if (ta.subtasks.length !== tb.subtasks.length) return false;
+    for (let j = 0; j < ta.subtasks.length; j++) {
       if (
-        pa.tasks[j].id !== pb.tasks[j].id ||
-        pa.tasks[j].title !== pb.tasks[j].title
+        ta.subtasks[j].id !== tb.subtasks[j].id ||
+        ta.subtasks[j].title !== tb.subtasks[j].title
       ) {
         return false;
       }

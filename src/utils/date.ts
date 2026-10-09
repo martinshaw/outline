@@ -1,3 +1,5 @@
+import { DAY_DOCUMENT_VERSION, type DayDocument } from '../types';
+
 const MONTHS = [
   'January',
   'February',
@@ -46,6 +48,6 @@ export function formatDayLabel(dateKey: string): string {
   return `${ordinal(d)} ${MONTHS[m - 1]} ${y}`;
 }
 
-export function emptyDayDocument(date: string): import('../types').DayDocument {
-  return { version: 1, date, items: [] };
+export function emptyDayDocument(date: string): DayDocument {
+  return { version: DAY_DOCUMENT_VERSION, date, items: [] };
 }

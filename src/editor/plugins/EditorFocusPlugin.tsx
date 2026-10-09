@@ -19,8 +19,7 @@ function isUiChromeTarget(target: EventTarget | null): boolean {
         '[role="dialog"]',
         '.sidebar',
         '.sidebar-backdrop',
-        '.topbar',
-        '.top-menu',
+        '.app-hints',
         '.settings-overlay',
         '.shortcuts-overlay',
         '.command-palette-overlay',
@@ -29,6 +28,8 @@ function isUiChromeTarget(target: EventTarget | null): boolean {
         '.gate',
         '.outline-status-chip',
         '.outline-status-menu',
+        '.outline-meta',
+        '.outline-meta-popover',
       ].join(','),
     ),
   );

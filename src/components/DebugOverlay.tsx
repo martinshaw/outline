@@ -4,6 +4,10 @@ import {
   subscribeBlockSelection,
 } from '../editor/blockSelectionStore';
 import {
+  getEntityCatalog,
+  subscribeEntities,
+} from '../entities/entityStore';
+import {
   getSettings,
   setSettings,
   subscribeSettings,
@@ -46,8 +50,8 @@ type ItemStats = {
 function collectStats(doc: DayDocument): ItemStats {
   const byKind: Record<ItemKind, number> = {
     note: 0,
-    project: 0,
     task: 0,
+    subtask: 0,
     heading: 0,
   };
   const byStatus: Record<string, number> = {};
@@ -59,7 +63,7 @@ function collectStats(doc: DayDocument): ItemStats {
     for (const item of items) {
       total += 1;
       byKind[item.kind] += 1;
-      if (item.kind === 'project' || item.kind === 'task') {
+      if (item.kind === 'task' || item.kind === 'subtask') {
         const key = item.status ?? '(none)';
         byStatus[key] = (byStatus[key] ?? 0) + 1;
       }
@@ -480,6 +484,7 @@ export function DebugOverlay({
   const [logs, setLogs] = useState<DebugLogEntry[]>(() => [...getDebugLogs()]);
   const [now, setNow] = useState(() => Date.now());
   const [settingsRev, setSettingsRev] = useState(0);
+  const [entitiesRev, setEntitiesRev] = useState(0);
   const logScrollRef = useRef<HTMLDivElement>(null);
   const prevSelRef = useRef<string>('');
 
@@ -488,6 +493,10 @@ export function DebugOverlay({
       setEnabled(next.developerMode);
       setSettingsRev((n) => n + 1);
     });
+  }, []);
+
+  useEffect(() => {
+    return subscribeEntities(() => setEntitiesRev((n) => n + 1));
   }, []);
 
   useEffect(() => {
@@ -563,6 +572,7 @@ export function DebugOverlay({
   const settingsSnap = useMemo(() => {
     if (!enabled || tab !== 'overview') return null;
     const s = getSettings();
+    const entities = getEntityCatalog().entities;
     return {
       theme: s.theme,
       font: s.systemFontFamily ?? s.font,
@@ -571,8 +581,10 @@ export function DebugOverlay({
       backup: s.backupMode,
       backupDir: s.backupDirectory,
       statuses: s.statuses.length,
+      people: entities.filter((e) => e.type === 'person').length,
+      entities: entities.length,
     };
-  }, [enabled, tab, settingsRev]);
+  }, [enabled, tab, settingsRev, entitiesRev]);
 
   if (!enabled || !isDebugEnabled()) {
     return null;
@@ -670,8 +682,8 @@ export function DebugOverlay({
                 </div>
                 <div>
                   kinds · note {stats.byKind.note} · heading{' '}
-                  {stats.byKind.heading} · project {stats.byKind.project} · task{' '}
-                  {stats.byKind.task}
+                  {stats.byKind.heading} · task {stats.byKind.task} · subtask{' '}
+                  {stats.byKind.subtask}
                 </div>
                 <div>status · {statusEntries(stats.byStatus)}</div>
                 <div>depth · {stats.maxDepth}</div>
@@ -721,6 +733,10 @@ export function DebugOverlay({
                   backup · {settingsSnap.backup} / {settingsSnap.backupDir}
                 </div>
                 <div>statuses · {settingsSnap.statuses}</div>
+                <div>
+                  entities · {settingsSnap.entities} ({settingsSnap.people}{' '}
+                  people)
+                </div>
               </section>
             </div>
 

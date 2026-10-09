@@ -183,9 +183,15 @@ function $handleBackspace(): boolean {
   const item = $getSelectedOutlineItem();
   if (!item || !$isAtStartOfItem(item)) return false;
 
-  // Backspace at start of a heading demotes it to a normal note.
-  if (item.getKind() === 'heading') {
+  // Backspace at start of a heading / task / subtask demotes to a note
+  // before merge, outdent, or the sole-item no-op.
+  const kind = item.getKind();
+  if (kind === 'heading') {
     item.setHeading(null);
+    return true;
+  }
+  if (kind === 'task' || kind === 'subtask') {
+    item.setKind('note');
     return true;
   }
 

@@ -1,13 +1,13 @@
 import { useEffect } from 'react';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
-import { $getRoot } from 'lexical';
+import { $getNodeByKey, $getRoot } from 'lexical';
 import {
   getSettings,
   subscribeSettings,
 } from '../../settings/settingsStore';
 import {
   $isOutlineItemNode,
-  type OutlineItemNode,
+  OutlineItemNode,
 } from '../nodes/OutlineItemNode';
 
 const MENU_CLASS = 'outline-status-menu';
@@ -21,7 +21,7 @@ function closeAllMenus(): void {
 
 function $markStatusChipsDirty(): void {
   const walk = (node: OutlineItemNode) => {
-    if (node.getKind() === 'project' || node.getKind() === 'task') {
+    if (node.getKind() === 'task' || node.getKind() === 'subtask') {
       node.markDirty();
     }
     for (const child of node.getChildren()) {
@@ -31,6 +31,13 @@ function $markStatusChipsDirty(): void {
   for (const child of $getRoot().getChildren()) {
     if ($isOutlineItemNode(child)) walk(child);
   }
+}
+
+/** Keep parent task “N of M done” labels in sync when the tree changes. */
+function $markAncestorTasksDirtyFromKey(key: string): void {
+  const node = $getNodeByKey(key);
+  if (!$isOutlineItemNode(node)) return;
+  node.markAncestorTasksDirty();
 }
 
 /**
@@ -145,11 +152,32 @@ export function StatusChipPlugin(): null {
       });
     });
 
+    const unsubMutations = editor.registerMutationListener(
+      OutlineItemNode,
+      (mutations) => {
+        const keys: string[] = [];
+        for (const [key, type] of mutations) {
+          if (type !== 'destroyed') keys.push(key);
+        }
+        if (keys.length === 0) return;
+        // Defer so we aren't nesting updates inside the mutation callback.
+        queueMicrotask(() => {
+          editor.update(
+            () => {
+              for (const key of keys) $markAncestorTasksDirtyFromKey(key);
+            },
+            { tag: 'historic' },
+          );
+        });
+      },
+    );
+
     window.addEventListener('mousedown', onMouseDown, true);
     window.addEventListener('click', onClick, true);
 
     return () => {
       unsubSettings();
+      unsubMutations();
       window.removeEventListener('mousedown', onMouseDown, true);
       window.removeEventListener('click', onClick, true);
       closeAllMenus();

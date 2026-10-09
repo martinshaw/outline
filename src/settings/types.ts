@@ -1,3 +1,10 @@
+import {
+  DEFAULT_ENTITY_TYPES,
+  type EntityTypeDef,
+} from '../entities/types';
+
+export type { EntityTypeDef } from '../entities/types';
+
 export type FontId =
   | 'source-serif'
   | 'literata'
@@ -44,8 +51,10 @@ export type AppSettings = {
   theme: ThemeId;
   /** Whether the notes sidebar starts collapsed. */
   sidebarCollapsed: boolean;
-  /** Configurable project/task statuses (chips + ⌘Enter cycle). */
+  /** Configurable task/subtask statuses (chips + ⌘Enter cycle). */
   statuses: StatusDef[];
+  /** Configurable entity types for task/subtask links (People, Company, Project, …). */
+  entityTypes: EntityTypeDef[];
   backupMode: BackupMode;
   /** Sibling directory name under the workspace root (letters, numbers, hyphens). */
   backupDirectory: string;
@@ -139,6 +148,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   theme: 'system',
   sidebarCollapsed: true,
   statuses: DEFAULT_STATUSES.map((s) => ({ ...s })),
+  entityTypes: DEFAULT_ENTITY_TYPES.map((t) => ({ ...t })),
   backupMode: 'on-next-day-write',
   backupDirectory: 'backups',
   saveDebounceMs: 400,

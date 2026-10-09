@@ -47,9 +47,12 @@ const SECTIONS: Section[] = [
       {
         keys: [mod, 'Enter'],
         action:
-          'Promote to project/task, or cycle status on project/task',
+          'Promote to task/subtask; cycle status, then demote to note',
       },
-      { keys: ['Backspace'], action: 'At start: merge or outdent' },
+      {
+        keys: ['Backspace'],
+        action: 'At start: demote task/subtask/heading, else merge or outdent',
+      },
       { keys: ['Esc'], action: 'Clear block selection' },
     ],
   },
@@ -84,7 +87,7 @@ const SECTIONS: Section[] = [
       },
       {
         keys: ['Backspace'],
-        action: 'At start of heading: demote to note',
+        action: 'At start of heading/task/subtask: demote to note',
       },
       { keys: ['Paste URL'], action: 'Insert link' },
       { keys: ['Right-click link'], action: 'Remove link' },
@@ -94,6 +97,13 @@ const SECTIONS: Section[] = [
     title: 'App',
     shortcuts: [
       { keys: [mod, 'P'], action: 'Command palette (settings, exports, folder…)' },
+      { keys: [mod, alt, 'F'], action: 'Search all notes' },
+      { keys: [mod, alt, 'T'], action: 'Manage tasks across notes' },
+      { keys: [mod, alt, ','], action: 'Open settings' },
+      {
+        keys: [mod, alt, 'A'],
+        action: 'Edit deadline & entities on task/subtask',
+      },
       { keys: ['?'], action: 'Open keyboard shortcuts' },
       { keys: [mod, '/'], action: 'Open keyboard shortcuts' },
       { keys: ['Esc'], action: 'Close dialog / clear selection' },

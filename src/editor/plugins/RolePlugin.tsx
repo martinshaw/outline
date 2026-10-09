@@ -10,40 +10,49 @@ import {
   getDefaultStatusId,
   getSettings,
 } from '../../settings/settingsStore';
+import { isRoleKind } from '../../types';
 import type { OutlineItemNode } from '../nodes/OutlineItemNode';
 import {
   $getMoveTargets,
-  $getNearestProjectParent,
+  $getNearestTaskParent,
   $getSelectedOutlineItem,
 } from '../utils/outlineHelpers';
 
-function $cycleStatus(item: OutlineItemNode): void {
+function $cycleStatusOrDemote(item: OutlineItemNode): void {
   const statuses = getSettings().statuses;
-  if (statuses.length === 0) return;
+  if (statuses.length === 0) {
+    item.setKind('note');
+    return;
+  }
   const current = item.getStatus() ?? statuses[0].id;
   const idx = statuses.findIndex((s) => s.id === current);
-  const next = statuses[(idx >= 0 ? idx + 1 : 0) % statuses.length];
-  item.setStatus(next.id);
+  const nextIdx = idx >= 0 ? idx + 1 : 0;
+  // After the last status, clear task/subtask back to a normal note.
+  if (nextIdx >= statuses.length) {
+    item.setKind('note');
+    return;
+  }
+  item.setStatus(statuses[nextIdx].id);
 }
 
 function $promoteOrCycle(item: OutlineItemNode): void {
   const kind = item.getKind();
 
-  if (kind === 'project' || kind === 'task') {
-    $cycleStatus(item);
+  if (isRoleKind(kind)) {
+    $cycleStatusOrDemote(item);
     return;
   }
 
-  // Note / heading → project (or task when nested under a project)
-  const underProject = $getNearestProjectParent(item) !== null;
+  // Note / heading → task (or subtask when nested under a task)
+  const underTask = $getNearestTaskParent(item) !== null;
   const status = getDefaultStatusId();
-  if (underProject) {
+  if (underTask) {
     item.setHeading(null);
-    item.setKind('task');
+    item.setKind('subtask');
     item.setStatus(status);
   } else {
     item.setHeading(null);
-    item.setKind('project');
+    item.setKind('task');
     item.setStatus(status);
   }
 }
@@ -61,9 +70,9 @@ function $toggleRole(): boolean {
 }
 
 /**
- * ⌘/Ctrl+Enter promotes a note to project/task, or cycles status on
- * project/task items. Capture-phase keydown stops Enter before Lexical's
- * insert-paragraph path.
+ * ⌘/Ctrl+Enter promotes a note to task/subtask, cycles status on
+ * task/subtask items, then demotes to a note after the last status.
+ * Capture-phase keydown stops Enter before Lexical's insert-paragraph path.
  */
 export function RolePlugin(): null {
   const [editor] = useLexicalComposerContext();

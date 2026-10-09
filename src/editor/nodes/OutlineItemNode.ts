@@ -13,7 +13,20 @@ import {
 } from 'lexical';
 import { getBlockSelectedIds } from '../blockSelectionStore';
 import { getStatusDef } from '../../settings/settingsStore';
-import type { HeadingLevel, ItemKind } from '../../types';
+import {
+  isRoleKind,
+  normalizeItemKind,
+  type HeadingLevel,
+  type ItemKind,
+} from '../../types';
+import {
+  formatMetaSubline,
+  formatSubtaskProgress,
+  isCompleteStatus,
+  isDeadlineOverdue,
+  isIsoDate,
+  normalizeEntities,
+} from '../../utils/itemMeta';
 
 export type SerializedOutlineItemNode = Spread<
   {
@@ -21,8 +34,11 @@ export type SerializedOutlineItemNode = Spread<
     kind: ItemKind;
     headingLevel: HeadingLevel | null;
     status: string | null;
+    deadline: string | null;
+    entities: string[];
     type: 'outline-item';
-    version: 1;
+    /** 2 = task/subtask kinds; 1 = legacy project/task. */
+    version: 1 | 2;
   },
   SerializedElementNode
 >;
@@ -41,6 +57,8 @@ export class OutlineItemNode extends ElementNode {
   __kind: ItemKind;
   __headingLevel: HeadingLevel | null;
   __status: string | null;
+  __deadline: string | null;
+  __entities: string[];
   __blockSelected: boolean;
 
   static getType(): string {
@@ -54,6 +72,8 @@ export class OutlineItemNode extends ElementNode {
       node.__status,
       node.__headingLevel,
       node.__key,
+      node.__deadline,
+      node.__entities,
     );
   }
 
@@ -63,12 +83,17 @@ export class OutlineItemNode extends ElementNode {
     status: string | null = null,
     headingLevel: HeadingLevel | null = null,
     key?: NodeKey,
+    deadline: string | null = null,
+    entities: string[] | null = null,
   ) {
     super(key);
     this.__id = id;
     this.__kind = kind;
     this.__headingLevel = normalizeHeadingLevel(kind, headingLevel);
-    this.__status = kind === 'project' || kind === 'task' ? status : null;
+    const isRole = isRoleKind(kind);
+    this.__status = isRole ? status : null;
+    this.__deadline = isRole && deadline && isIsoDate(deadline) ? deadline : null;
+    this.__entities = isRole ? normalizeEntities(entities) : [];
     this.__blockSelected = false;
   }
 
@@ -83,9 +108,14 @@ export class OutlineItemNode extends ElementNode {
   setKind(kind: ItemKind): this {
     const writable = this.getWritable();
     writable.__kind = kind;
-    if (kind === 'note' || kind === 'heading') writable.__status = null;
+    if (kind === 'note' || kind === 'heading') {
+      writable.__status = null;
+      writable.__deadline = null;
+      writable.__entities = [];
+    }
     if (kind !== 'heading') writable.__headingLevel = null;
     else if (writable.__headingLevel == null) writable.__headingLevel = 1;
+    writable.markAncestorTasksDirty();
     return writable;
   }
 
@@ -99,11 +129,15 @@ export class OutlineItemNode extends ElementNode {
     if (level == null) {
       if (writable.__kind === 'heading') writable.__kind = 'note';
       writable.__headingLevel = null;
+      writable.markAncestorTasksDirty();
       return writable;
     }
     writable.__kind = 'heading';
     writable.__headingLevel = level;
     writable.__status = null;
+    writable.__deadline = null;
+    writable.__entities = [];
+    writable.markAncestorTasksDirty();
     return writable;
   }
 
@@ -114,6 +148,28 @@ export class OutlineItemNode extends ElementNode {
   setStatus(status: string | null): this {
     const writable = this.getWritable();
     writable.__status = status;
+    writable.markAncestorTasksDirty();
+    return writable;
+  }
+
+  getDeadline(): string | null {
+    return this.getLatest().__deadline;
+  }
+
+  setDeadline(deadline: string | null): this {
+    const writable = this.getWritable();
+    writable.__deadline =
+      deadline && isIsoDate(deadline) ? deadline : null;
+    return writable;
+  }
+
+  getEntities(): string[] {
+    return [...this.getLatest().__entities];
+  }
+
+  setEntities(entities: string[] | null): this {
+    const writable = this.getWritable();
+    writable.__entities = normalizeEntities(entities);
     return writable;
   }
 
@@ -133,34 +189,35 @@ export class OutlineItemNode extends ElementNode {
     return dom;
   }
 
-  updateDOM(prev: OutlineItemNode, dom: HTMLElement): boolean {
-    if (
-      prev.__kind !== this.__kind ||
-      prev.__status !== this.__status ||
-      prev.__headingLevel !== this.__headingLevel ||
-      prev.__blockSelected !== this.__blockSelected
-    ) {
-      this.applyDomAttrs(dom);
-    }
+  updateDOM(_prev: OutlineItemNode, dom: HTMLElement): boolean {
+    // Always refresh chrome. Subtask progress (and selection classes) can change
+    // when only descendants mutate — this node's own fields stay the same.
+    this.applyDomAttrs(dom);
     return false;
   }
 
   /**
-   * Lexical children insert *before* the optional status chip so the first
-   * DOM child is editable (empty-row caret stays on the text line). Bullet /
-   * kind label are CSS pseudo-elements for the same reason. Chip is excluded
-   * from reconciliation via withBefore and painted in the gutter with CSS.
+   * DOM: [status chip?][editable children…][meta][progress].
+   * Chip leads so the caret sits after it (flex order alone left the caret
+   * stranded before the chip on empty task rows).
    */
   getDOMSlot(element: HTMLElement): ElementDOMSlot {
-    const slot = super.getDOMSlot(element);
+    let slot = super.getDOMSlot(element);
     const host = element as HTMLElement & {
       __outlineStatusChip?: HTMLElement | null;
+      __outlineMeta?: HTMLElement | null;
     };
+    const meta =
+      host.__outlineMeta?.isConnected
+        ? host.__outlineMeta
+        : element.querySelector(':scope > .outline-meta');
     const chip =
       host.__outlineStatusChip?.isConnected
         ? host.__outlineStatusChip
         : element.querySelector(':scope > .outline-status-chip');
-    return chip ? slot.withBefore(chip) : slot;
+    if (chip) slot = slot.withAfter(chip);
+    if (meta) slot = slot.withBefore(meta);
+    return slot;
   }
 
   private applyDomAttrs(dom: HTMLElement): void {
@@ -180,9 +237,40 @@ export class OutlineItemNode extends ElementNode {
     this.syncChrome(dom);
   }
 
+  /** Refresh ancestor task chrome when subtask counts / completion change. */
+  markAncestorTasksDirty(): void {
+    let parent = this.getParent();
+    while (parent) {
+      if ($isOutlineItemNode(parent) && parent.getKind() === 'task') {
+        parent.markDirty();
+      }
+      parent = parent.getParent();
+    }
+  }
+
+  private countDescendantSubtasks(): { total: number; complete: number } {
+    let total = 0;
+    let complete = 0;
+    const walk = (node: OutlineItemNode) => {
+      for (const child of node.getChildren()) {
+        if (!$isOutlineItemNode(child)) continue;
+        if (child.getKind() === 'subtask') {
+          total += 1;
+          if (isCompleteStatus(child.getStatus())) complete += 1;
+        }
+        // Nested tasks own their own subtask progress.
+        if (child.getKind() !== 'task') walk(child);
+      }
+    };
+    walk(this);
+    return { total, complete };
+  }
+
   private syncChrome(dom: HTMLElement): void {
     const host = dom as HTMLElement & {
       __outlineStatusChip?: HTMLButtonElement | null;
+      __outlineMeta?: HTMLButtonElement | null;
+      __outlineSubtaskProgress?: HTMLElement | null;
     };
 
     // Drop legacy DOM chrome (bullet/label spans) if present from older builds.
@@ -194,11 +282,23 @@ export class OutlineItemNode extends ElementNode {
       host.__outlineStatusChip?.isConnected
         ? host.__outlineStatusChip
         : dom.querySelector<HTMLButtonElement>(':scope > .outline-status-chip');
+    let meta =
+      host.__outlineMeta?.isConnected
+        ? host.__outlineMeta
+        : dom.querySelector<HTMLButtonElement>(':scope > .outline-meta');
+    let progress =
+      host.__outlineSubtaskProgress?.isConnected
+        ? host.__outlineSubtaskProgress
+        : dom.querySelector<HTMLElement>(':scope > .outline-subtask-progress');
 
-    if (this.__kind !== 'project' && this.__kind !== 'task') {
+    if (!isRoleKind(this.__kind)) {
       chip?.remove();
+      meta?.remove();
+      progress?.remove();
       host.__outlineStatusChip = null;
-      dom.style.removeProperty('--outline-chip-indent');
+      host.__outlineMeta = null;
+      host.__outlineSubtaskProgress = null;
+      dom.classList.remove('outline-item--has-meta');
       return;
     }
 
@@ -210,9 +310,9 @@ export class OutlineItemNode extends ElementNode {
       chip.tabIndex = -1;
       chip.setAttribute('aria-haspopup', 'listbox');
       chip.setAttribute('aria-expanded', 'false');
-      dom.appendChild(chip);
-    } else if (chip.parentElement !== dom) {
-      dom.appendChild(chip);
+      dom.insertBefore(chip, dom.firstChild);
+    } else if (chip.parentElement !== dom || dom.firstChild !== chip) {
+      dom.insertBefore(chip, dom.firstChild);
     }
     host.__outlineStatusChip = chip;
 
@@ -224,22 +324,72 @@ export class OutlineItemNode extends ElementNode {
       chip.setAttribute('aria-label', `Status: ${status.label}`);
     }
     chip.style.setProperty('--status-color', status.color);
-    // Reserve content indent for the absolutely positioned chip.
-    // Skip layout measure when the label hasn't changed (hot during typing elsewhere).
-    if (chip.dataset.measuredLabel !== status.label) {
-      dom.style.setProperty(
-        '--outline-chip-indent',
-        `${Math.max(2.6, status.label.length * 0.42 + 0.85)}em`,
-      );
-      chip.dataset.measuredLabel = status.label;
-      requestAnimationFrame(() => {
-        if (!chip?.isConnected || !dom.isConnected) return;
-        const w = chip.getBoundingClientRect().width;
-        if (w > 0) {
-          dom.style.setProperty('--outline-chip-indent', `${Math.ceil(w)}px`);
-        }
-      });
+
+    const subline = formatMetaSubline(this.__deadline, this.__entities);
+    const hasMeta = subline.length > 0;
+
+    if (!meta) {
+      meta = document.createElement('button');
+      meta.type = 'button';
+      meta.className = 'outline-meta';
+      meta.contentEditable = 'false';
+      meta.tabIndex = -1;
+      meta.setAttribute('aria-haspopup', 'dialog');
+      dom.appendChild(meta);
+    } else if (meta.parentElement !== dom) {
+      dom.appendChild(meta);
     }
+    // Chip first; meta + progress trail. Children sit between (getDOMSlot).
+    const progressLabel =
+      this.__kind === 'task'
+        ? (() => {
+            const { total, complete } = this.countDescendantSubtasks();
+            return formatSubtaskProgress(total, complete);
+          })()
+        : null;
+
+    if (progressLabel) {
+      if (!progress) {
+        progress = document.createElement('span');
+        progress.className = 'outline-subtask-progress';
+        progress.contentEditable = 'false';
+        dom.appendChild(progress);
+      } else if (progress.parentElement !== dom) {
+        dom.appendChild(progress);
+      }
+      if (progress.dataset.progressText !== progressLabel) {
+        progress.dataset.progressText = progressLabel;
+        progress.textContent = progressLabel;
+        progress.title = 'Subtask progress';
+      }
+      host.__outlineSubtaskProgress = progress;
+    } else {
+      progress?.remove();
+      progress = null;
+      host.__outlineSubtaskProgress = null;
+    }
+
+    // Keep trailing chrome after Lexical children (chip already leads).
+    dom.appendChild(meta);
+    if (progress) dom.appendChild(progress);
+    host.__outlineMeta = meta;
+    dom.classList.toggle('outline-item--has-meta', hasMeta);
+
+    const display = hasMeta ? subline : 'Deadline · Entities';
+    if (meta.dataset.metaText !== display) {
+      meta.dataset.metaText = display;
+      meta.textContent = display;
+      meta.title = 'Edit deadline & entities';
+      meta.setAttribute(
+        'aria-label',
+        hasMeta ? `Attributes: ${subline}` : 'Add deadline & entities',
+      );
+    }
+    meta.classList.toggle('outline-meta--empty', !hasMeta);
+    meta.classList.toggle(
+      'outline-meta--overdue',
+      isDeadlineOverdue(this.__deadline),
+    );
   }
 
   private buildClassName(): string {
@@ -285,17 +435,26 @@ export class OutlineItemNode extends ElementNode {
       kind: this.__kind,
       headingLevel: this.__headingLevel,
       status: this.__status,
+      deadline: this.__deadline,
+      entities: this.__entities,
       type: 'outline-item',
-      version: 1,
+      version: 2,
     };
   }
 
   static importJSON(serialized: SerializedOutlineItemNode): OutlineItemNode {
+    const legacy = serialized as SerializedOutlineItemNode & {
+      people?: string[] | null;
+      kind?: string;
+    };
+    const schemaVersion = serialized.version === 2 ? 2 : 1;
     return $createOutlineItemNode(
       serialized.id,
-      serialized.kind,
+      normalizeItemKind(legacy.kind ?? 'note', schemaVersion),
       serialized.status ?? null,
       serialized.headingLevel ?? null,
+      serialized.deadline ?? null,
+      serialized.entities ?? legacy.people ?? null,
     );
   }
 
@@ -328,14 +487,16 @@ function kindLabelFor(
     const level = headingLevel && headingLevel >= 1 && headingLevel <= 6 ? headingLevel : 1;
     return `H${level}`;
   }
-  if (kind === 'project') return 'Project';
   if (kind === 'task') return 'Task';
+  if (kind === 'subtask') return 'Subtask';
   return null;
 }
 
 function convertOutlineElement(domNode: HTMLElement): DOMConversionOutput {
   const id = domNode.getAttribute('data-outline-id') ?? crypto.randomUUID();
-  const kind = (domNode.getAttribute('data-kind') as ItemKind) || 'note';
+  // DOM from current builds uses task/subtask; only map legacy `project`.
+  const rawKind = domNode.getAttribute('data-kind') ?? 'note';
+  const kind = normalizeItemKind(rawKind, rawKind === 'project' ? 1 : 2);
   const status = domNode.getAttribute('data-status');
   const levelAttr = domNode.getAttribute('data-heading-level');
   const headingLevel =
@@ -350,9 +511,19 @@ export function $createOutlineItemNode(
   kind: ItemKind = 'note',
   status: string | null = null,
   headingLevel: HeadingLevel | null = null,
+  deadline: string | null = null,
+  entities: string[] | null = null,
 ): OutlineItemNode {
   return $applyNodeReplacement(
-    new OutlineItemNode(id, kind, status, headingLevel),
+    new OutlineItemNode(
+      id,
+      kind,
+      status,
+      headingLevel,
+      undefined,
+      deadline,
+      entities,
+    ),
   );
 }
 

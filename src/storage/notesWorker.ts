@@ -1,4 +1,8 @@
-import type { DayDocument, SidebarDay } from '../types';
+import {
+  normalizeDayDocument,
+  type DayDocument,
+  type SidebarDay,
+} from '../types';
 import { buildSidebarFromDocs, isDayEmpty } from '../utils/outline';
 
 const NOTES_DIR = 'notes';
@@ -81,8 +85,7 @@ async function rebuildManifest(): Promise<void> {
 async function loadDay(date: string): Promise<DayDocument | null> {
   const notes = await getNotesDir();
   const doc = await readJsonFile<DayDocument>(notes, `${date}.json`);
-  if (!doc || doc.version !== 1) return null;
-  return doc;
+  return normalizeDayDocument(doc);
 }
 
 async function loadIndex(): Promise<{

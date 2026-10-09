@@ -12,10 +12,12 @@ import {
   FONT_SIZE_STEP,
   type AppSettings,
   type BackupMode,
+  type EntityTypeDef,
   type FontId,
   type StatusDef,
   type ThemeId,
 } from './types';
+import { DEFAULT_ENTITY_TYPES } from '../entities/types';
 
 const LEGACY_STORAGE_KEY = 'outline.settings.v1';
 
@@ -114,6 +116,38 @@ export function normalizeStatuses(raw: unknown): StatusDef[] {
   return out.length > 0 ? out : DEFAULT_STATUSES.map((s) => ({ ...s }));
 }
 
+export function normalizeEntityTypes(raw: unknown): EntityTypeDef[] {
+  if (!Array.isArray(raw)) {
+    return DEFAULT_ENTITY_TYPES.map((t) => ({ ...t }));
+  }
+  const seen = new Set<string>();
+  const out: EntityTypeDef[] = [];
+  for (const entry of raw) {
+    if (!entry || typeof entry !== 'object') continue;
+    const rec = entry as Partial<EntityTypeDef>;
+    const label =
+      typeof rec.label === 'string' ? rec.label.trim().slice(0, 40) : '';
+    if (!label) continue;
+    let id =
+      typeof rec.id === 'string' && rec.id.trim()
+        ? rec.id.trim().slice(0, 40)
+        : slugStatusId(label);
+    id = id.replace(/[^a-zA-Z0-9_-]/g, '-') || slugStatusId(label);
+    // Singularize common plurals for stable ids when creating from label.
+    if (id === 'people') id = 'person';
+    if (id === 'companies') id = 'company';
+    if (id === 'projects') id = 'project';
+    let unique = id;
+    let n = 2;
+    while (seen.has(unique)) {
+      unique = `${id}-${n++}`;
+    }
+    seen.add(unique);
+    out.push({ id: unique, label });
+  }
+  return out.length > 0 ? out : DEFAULT_ENTITY_TYPES.map((t) => ({ ...t }));
+}
+
 export function getDefaultStatusId(): string {
   return getSettings().statuses[0]?.id ?? DEFAULT_STATUSES[0].id;
 }
@@ -151,6 +185,9 @@ export function normalizeSettings(
   }
   if ('statuses' in partial) {
     base.statuses = normalizeStatuses(partial.statuses);
+  }
+  if ('entityTypes' in partial) {
+    base.entityTypes = normalizeEntityTypes(partial.entityTypes);
   }
   if (isBackupMode(partial.backupMode)) base.backupMode = partial.backupMode;
   if (typeof partial.backupDirectory === 'string') {
