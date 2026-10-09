@@ -1,6 +1,6 @@
 # Outline
 
-**Version 0.8.1** · [Live demo](https://martinshaw.github.io/outline/) · [Repository](https://github.com/martinshaw/outline)
+**Version 1.0.0** · [Live demo](https://martinshaw.github.io/outline/) · [Repository](https://github.com/martinshaw/outline)
 
 Local-first chronological outline editor inspired by [LogSeq](https://logseq.com). Notes live in a folder on your computer via Chrome’s File System Access API — no account, no server, no sync backend.
 
@@ -16,11 +16,13 @@ Built with [React](https://react.dev), [Lexical](https://lexical.dev), [Vite](ht
 4. [Using the app](#using-the-app)
    - [Daily notes](#daily-notes)
    - [Sidebar](#sidebar)
-   - [Notes, projects, tasks, headings & status](#notes-projects-tasks-headings--status)
+   - [Notes, tasks, subtasks, headings & status](#notes-tasks-subtasks-headings--status)
    - [Outliner behavior](#outliner-behavior)
    - [Links](#links)
    - [Block selection](#block-selection)
    - [Command palette](#command-palette)
+   - [Tasks across notes](#tasks-across-notes)
+   - [Search notes](#search-notes)
    - [Settings](#settings)
 5. [Keyboard shortcuts](#keyboard-shortcuts)
 6. [Storage layout](#storage-layout)
@@ -43,11 +45,14 @@ Built with [React](https://react.dev), [Lexical](https://lexical.dev), [Vite](ht
 |------|----------------|
 | **Daily notes** | One outline document per calendar day (`YYYY-MM-DD`) |
 | **Nested outliner** | Indent, outdent, and reorder with LogSeq-style tree moves |
-| **Projects & tasks** | Promote blocks; tasks nest under projects |
-| **Status chips** | Inline coloured chips on projects/tasks; configurable statuses |
-| **Kind labels** | Quiet gutter labels for projects, tasks, and heading levels |
+| **Tasks & subtasks** | Promote blocks; subtasks nest under tasks |
+| **Tasks table** | Filterable cross-note task dialog (`⌘⌥T`); change status or jump to a block |
+| **Search** | Full-text search across all notes (`⌘⌥F`) with an inverted index |
+| **Status chips** | Inline coloured chips on tasks/subtasks; configurable statuses |
+| **Deadlines & entities** | Tagline on tasks/subtasks; link workspace entities; `⌘⌥A` |
+| **Kind labels** | Quiet gutter labels for tasks, subtasks, and heading levels |
 | **Headings** | Markdown `#` … `######` + space → heading blocks (levels 1–6) |
-| **Sidebar** | Navigate days → projects → tasks; collapse state persisted |
+| **Sidebar** | Navigate days → tasks → subtasks; collapse state persisted |
 | **Rich text** | Bold, italic, underline |
 | **Links** | Paste/type URLs; click to open; unlink / whole-link delete |
 | **Block selection** | Gutter select, multi-select, drag to relocate at any level |
@@ -120,20 +125,24 @@ Serve `dist/` over HTTPS (or localhost) if you host it yourself.
 
 ### Sidebar
 
-- Lists non-empty days (newest first), with projects and their tasks nested underneath.
-- Click a day, project, or task to jump there.
-- Toggle with ☰ in the top bar (collapsed by default; preference is saved in settings).
+- Lists non-empty days (newest first), with tasks and their subtasks nested underneath.
+- Click a day, task, or subtask to jump there.
+- Toggle via **Show / Hide notes sidebar** in the command palette or Settings (collapsed by default).
 
-### Notes, projects, tasks, headings & status
+### Notes, tasks, subtasks, headings & status
 
 | Kind | How you get it | Marker |
 |------|----------------|--------|
 | **Note** | Default | Hollow circle |
 | **Heading** | Type `#` … `######` then space at the start of a block | Hollow circle + larger type + `H1`…`H6` gutter label |
-| **Project** | `⌘Enter` / `Ctrl+Enter` on a note/heading (not under a project) | Circle + **status chip** + `PROJECT` gutter label |
-| **Task** | `⌘Enter` / `Ctrl+Enter` on a note/heading **under** a project | Circle + **status chip** + `TASK` gutter label |
+| **Task** | `⌘Enter` / `Ctrl+Enter` on a note/heading (not under a task) | Circle + **status chip** + `TASK` gutter label |
+| **Subtask** | `⌘Enter` / `Ctrl+Enter` on a note/heading **under** a task | Circle + **status chip** + `SUBTASK` gutter label |
 
-On a **project** or **task**, `⌘Enter` / `Ctrl+Enter` **cycles status** (does not demote to a note). Backspace at the start of a **heading** demotes it to a note.
+On a **task** or **subtask**, `⌘Enter` / `Ctrl+Enter` **cycles status**; after the last status it **demotes to a note**. Backspace at the start of a **heading**, **task**, or **subtask** demotes it to a note.
+
+Tasks and subtasks can also carry a **deadline** and linked **entities**. When set, they appear as muted text after the title (`Due Fri 11 · Ada, Acme`). Hover a task/subtask with no attributes to reveal **Deadline · Entities** at the end of the title, then click to edit. Shortcut: **`⌘⌥A` / `Ctrl+Alt+A`** (also in the command palette).
+
+**Entities** live in workspace `entities.json`. Attribute editing shows one multiselect per configured type (Settings → Entities; defaults **People**, **Company**, and **Project**). Type to pick an existing name, or press Enter when nothing matches to create a new entity of that type. Day items store **entity ids**, so the same objects can be reused across days and used to relate tasks/subtasks by shared factors.
 
 Default statuses (editable in Settings → Statuses):
 
@@ -143,7 +152,7 @@ Default statuses (editable in Settings → Statuses):
 4. Done  
 5. Archived  
 
-Click a status chip to open a dropdown and pick a status. The chosen status is stored on the item in the day JSON. Tasks keep their kind when moved outside a project.
+Click a status chip to open a dropdown and pick a status. The chosen status is stored on the item in the day JSON. Subtasks keep their kind when moved outside a task.
 
 ### Outliner behavior
 
@@ -186,26 +195,56 @@ Open with **`⌘P` / `Ctrl+P`**. Type to filter; `↑` `↓` and `Enter` to run.
 
 | Command | Purpose |
 |---------|---------|
+| **Show / Hide notes sidebar** | Toggle the day list |
 | **Change folder** | Pick a different notes directory |
-| **Insert test hierarchy** | Sample nested outline for the active day |
+| **Insert test hierarchy** | Sample nested outline (only when developer mode is on) |
+| **Manage tasks** | Filterable table of tasks/subtasks across notes (`⌘⌥T`) |
+| **Search notes** | Full-text search across every day (`⌘⌥F`) |
 | **Keyboard shortcuts** | Same as `?` or `⌘/` / `Ctrl+/` |
 | **Settings** | Font, theme, statuses, backups, autosave |
+| **Edit deadline & entities** | Attributes on the current task/subtask (`⌘⌥A`) |
 | **Show / Hide developer panel** | Toggle the bottom-right debug UI |
 | **Export day / selection** | JSON, YAML, Markdown, Text, or HTML |
 
 Errors (save failures, empty selection export, etc.) show as toasts.
 
+### Tasks across notes
+
+Open with **`⌘⌥T` / `Ctrl+Alt+T`**, the command palette (**Manage tasks**), or the top-right hint.
+
+The dialog indexes every task and subtask in the loaded notes cache and shows them in a filterable table:
+
+- Search by title, note date, status, parent task, or entity
+- Filter by kind, deadline (overdue / today / upcoming / none), and status chips
+- Filter by **common entities** (frequency-ranked chips; expand for all used entities by type)
+- Hide completed (done / archived) by default
+- Sort by note, title, kind, status, or deadline
+- Change status inline (saves the day file)
+- Click a row (or `Enter`) to jump to that block in the editor
+
+### Search notes
+
+Open with **`⌘⌥F` / `Ctrl+Alt+F`**, the command palette (**Search notes**), or the top-right hint.
+
+Outline builds an **inverted full-text index** over every outline block in the loaded notes cache:
+
+- Chunked rebuild when you open a workspace (keeps the UI responsive with many days)
+- Incremental reindex of a day as you edit or save
+- Token AND matching with prefix completion on the last word
+- Snippets with highlighted matches; `Enter` / click jumps to the block
+
 ### Settings
 
-Open **Settings** from the command palette. Preferences are saved as **`settings.json`** in the root of your workspace folder (next to `notes/`), so they travel with your files — not in the browser.
+Open **Settings** with **`⌘⌥,` / `Ctrl+Alt+,`** or from the command palette. Preferences are saved as **`settings.json`** in the root of your workspace folder (next to `notes/`), so they travel with your files — not in the browser.
 
 | Section | Options |
 |---------|---------|
 | **Editor → Font** | Built-in presets, loaded system fonts, **Add system fonts…** (Local Font Access); type to search |
 | **Editor → Size** | Slider 0.7–1.4rem (default **1.05rem** in the middle) |
 | **Appearance → Theme** | System, Light, Dark |
-| **Appearance → Collapse sidebar** | Also toggled with ☰ |
-| **Statuses** | Labels and colours for project/task chips; add / remove / reset list |
+| **Appearance → Collapse sidebar** | Also toggled from the command palette |
+| **Statuses** | Labels and colours for task/subtask chips; add / remove / reset list |
+| **Entities** | Types for attribute multiselects (default People, Company, Project); catalog in `entities.json` |
 | **Backups → When to backup** | On next day’s first write (default), or Off |
 | **Backups → Folder name** | Sibling of `notes/` (default `backups`) |
 | **Saving → Autosave delay** | 250 ms – 1.5 s |
@@ -240,8 +279,8 @@ Press `?` or `⌘/` / `Ctrl+/` in the app for the same list.
 | `Shift+Tab` | Outdent (following siblings become children) |
 | `⌘⇧↑` / `⌘⇧↓` (macOS) | Move block or selection up / down |
 | `Alt+Shift+↑` / `Alt+Shift+↓` (Windows/Linux) | Move block or selection up / down |
-| `⌘Enter` / `Ctrl+Enter` | Promote note/heading → project/task; cycle status on project/task |
-| `Backspace` (at start) | Merge with previous or outdent; demote heading → note |
+| `⌘Enter` / `Ctrl+Enter` | Promote note/heading → task/subtask; cycle status, then demote to note |
+| `Backspace` (at start) | Demote heading/task/subtask → note; else merge or outdent |
 | `Esc` | Clear block selection |
 
 ### Selection
@@ -271,6 +310,10 @@ Press `?` or `⌘/` / `Ctrl+/` in the app for the same list.
 | Shortcut | Action |
 |----------|--------|
 | `⌘P` / `Ctrl+P` | Command palette (settings, exports, folder…) |
+| `⌘⌥F` / `Ctrl+Alt+F` | Search all notes |
+| `⌘⌥T` / `Ctrl+Alt+T` | Manage tasks across notes |
+| `⌘⌥,` / `Ctrl+Alt+,` | Open settings |
+| `⌘⌥A` / `Ctrl+Alt+A` | Edit deadline & entities (task/subtask) |
 | `?` | Open keyboard shortcuts |
 | `⌘/` / `Ctrl+/` | Open keyboard shortcuts |
 | `Esc` | Close dialog / clear selection |
@@ -284,6 +327,7 @@ Everything stays inside the folder you grant:
 ```text
 your-folder/
   settings.json           # app preferences (font, theme, statuses, backups, …)
+  entities.json           # workspace entities (people, companies, …)
   notes/
     2026-10-08.json       # one file per day with content
     manifest.json         # index of day keys (rebuilt on save)
@@ -315,13 +359,15 @@ Each `notes/YYYY-MM-DD.json` file looks like:
 
 ```json
 {
-  "version": 1,
+  "version": 2,
   "date": "2026-10-08",
   "items": [
     {
       "id": "…",
-      "kind": "project",
+      "kind": "task",
       "status": "in-progress",
+      "deadline": "2026-10-15",
+      "entities": ["«entity-id-ada»", "«entity-id-acme»"],
       "content": [
         { "type": "text", "text": "Ship outline", "format": { "bold": true } },
         { "type": "link", "url": "https://example.com", "text": "spec" }
@@ -329,8 +375,10 @@ Each `notes/YYYY-MM-DD.json` file looks like:
       "children": [
         {
           "id": "…",
-          "kind": "task",
+          "kind": "subtask",
           "status": "todo",
+          "deadline": null,
+          "entities": [],
           "content": [{ "type": "text", "text": "Write README" }],
           "children": []
         }
@@ -342,16 +390,40 @@ Each `notes/YYYY-MM-DD.json` file looks like:
 
 | Field | Description |
 |-------|-------------|
-| `version` | Schema version (`1`) |
+| `version` | Schema version (`2`; `1` with `project`/`task` kinds is migrated on load) |
 | `date` | `YYYY-MM-DD` (local calendar) |
 | `items` | Top-level outline nodes |
-| `kind` | `"note"` \| `"project"` \| `"task"` \| `"heading"` |
+| `kind` | `"note"` \| `"task"` \| `"subtask"` \| `"heading"` |
 | `headingLevel` | `1`–`6` when `kind` is `"heading"`; otherwise omitted/`null` |
-| `status` | Status id for project/task (from `settings.json` statuses); omitted/`null` for notes/headings |
+| `status` | Status id for task/subtask (from `settings.json` statuses); omitted/`null` for notes/headings |
+| `deadline` | ISO date `YYYY-MM-DD` for task/subtask; omitted/`null` otherwise |
+| `entities` | Workspace **entity ids** from `entities.json`; `[]` / omitted otherwise |
+| `people` | Legacy; migrated into `entities` on load |
 | `content` | Inline segments: plain/formatted text or links |
 | `children` | Nested outline items |
 
 `manifest.json` lists known day keys and is regenerated whenever days are saved or removed.
+
+### Workspace entities (`entities.json`)
+
+Enumerable objects shared across the workspace. Types are configured in Settings → Entities (`entityTypes` in `settings.json`; defaults `person` / People, `company` / Company, and `project` / Project).
+
+```json
+{
+  "version": 1,
+  "entities": [
+    { "id": "…", "type": "person", "label": "Ada" },
+    { "id": "…", "type": "company", "label": "Acme" },
+    { "id": "…", "type": "project", "label": "Apollo" }
+  ]
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `id` | Stable id referenced by day items (`entities`) |
+| `type` | Entity kind id from settings (`person`, `company`, `project`, …) |
+| `label` | Display name (unique per type, case-insensitive) |
 
 ---
 
@@ -373,6 +445,11 @@ Each `notes/YYYY-MM-DD.json` file looks like:
     { "id": "in-progress", "label": "In progress", "color": "#d97706" },
     { "id": "done", "label": "Done", "color": "#16a34a" },
     { "id": "archived", "label": "Archived", "color": "#9ca3af" }
+  ],
+  "entityTypes": [
+    { "id": "person", "label": "People" },
+    { "id": "company", "label": "Company" },
+    { "id": "project", "label": "Project" }
   ],
   "backupMode": "on-next-day-write",
   "backupDirectory": "backups",
@@ -417,7 +494,7 @@ Selection export requires at least one block selected.
 
 ### Small screens
 
-- Notes list becomes a **slide-over drawer** (☰); choosing a day/item closes it.
+- Notes list becomes a **slide-over drawer** (open via the command palette or Settings); choosing a day/item closes it.
 - Editor gutters tighten so more of each line is visible.
 - Dialogs and the developer panel adapt to narrow viewports and home-indicator insets.
 
@@ -456,9 +533,10 @@ Selection export requires at least one block selected.
 | Path | Role |
 |------|------|
 | `src/editor/` | Lexical editor, outline nodes, plugins (indent, selection, status chips, links, headings) |
-| `src/storage/` | Folder I/O, saves, backups, `settings.json`, change log, debug store |
+| `src/storage/` | Folder I/O, saves, backups, `settings.json`, `entities.json`, change log, debug store |
+| `src/entities/` | Workspace entity catalog (people) + occurrence queries |
 | `src/settings/` | Preferences model, normalisation, Local Font Access |
-| `src/sidebar/` | Day / project / task navigation |
+| `src/sidebar/` | Day / task / subtask navigation |
 | `src/components/` | Gate, menu, settings/shortcuts dialogs, developer panel, toasts, font picker |
 | `src/assets/patterns/` | Setup-page background tile |
 | `src/utils/export.ts` | Export serializers |

@@ -1,3 +1,4 @@
+import { resolveEntityLabels } from '../entities/entityStore';
 import { getBlockSelectedIds } from '../editor/blockSelectionStore';
 import type { DayDocument, InlineSegment, OutlineItem } from '../types';
 import { segmentsToPlainText } from './outline';
@@ -69,11 +70,23 @@ function segmentsToHtml(segments: InlineSegment[]): string {
 }
 
 function kindPrefix(item: OutlineItem): string {
-  if (item.kind === 'project' || item.kind === 'task') {
+  if (item.kind === 'task' || item.kind === 'subtask') {
     const status = item.status ? `:${item.status}` : '';
     return `[${item.kind}${status}] `;
   }
   return '';
+}
+
+function metaSuffix(item: OutlineItem): string {
+  if (item.kind !== 'task' && item.kind !== 'subtask') return '';
+  const bits: string[] = [];
+  if (item.deadline) bits.push(`due:${item.deadline}`);
+  const entityIds = item.entities ?? item.people;
+  if (entityIds?.length) {
+    const labels = resolveEntityLabels(entityIds);
+    bits.push(`entities:${(labels.length ? labels : entityIds).join('|')}`);
+  }
+  return bits.length ? ` {${bits.join(' ')}}` : '';
 }
 
 function headingMarks(item: OutlineItem): string {
@@ -92,7 +105,7 @@ function toMarkdown(items: OutlineItem[], depth = 0): string {
     if (item.kind === 'heading') {
       lines.push(`${pad}- ${headingMarks(item)}${body}`);
     } else {
-      lines.push(`${pad}- ${kindPrefix(item)}${body}`);
+      lines.push(`${pad}- ${kindPrefix(item)}${body}${metaSuffix(item)}`);
     }
     if (item.children.length) lines.push(toMarkdown(item.children, depth + 1));
   }
@@ -104,7 +117,9 @@ function toPlainText(items: OutlineItem[], depth = 0): string {
   const lines: string[] = [];
   for (const item of items) {
     const body = segmentsToPlainText(item.content);
-    lines.push(`${pad}${kindPrefix(item)}${headingMarks(item)}${body}`);
+    lines.push(
+      `${pad}${kindPrefix(item)}${headingMarks(item)}${body}${metaSuffix(item)}`,
+    );
     if (item.children.length) lines.push(toPlainText(item.children, depth + 1));
   }
   return lines.join('\n');
@@ -209,7 +224,7 @@ export function serializeExport(
   if (scope === 'selection' && items.length === 0) return null;
 
   const payloadDoc: DayDocument = {
-    version: 1,
+    version: doc.version,
     date: doc.date,
     items,
   };

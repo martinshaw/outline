@@ -21,9 +21,11 @@ import {
   THEME_OPTIONS,
   type AppSettings,
   type BackupMode,
+  type EntityTypeDef,
   type StatusDef,
   type ThemeId,
 } from '../settings/types';
+import { DEFAULT_ENTITY_TYPES } from '../entities/types';
 import { FontPicker, type FontPickerValue } from './FontPicker';
 
 type Props = {
@@ -35,6 +37,7 @@ type SettingsSectionId =
   | 'editor'
   | 'appearance'
   | 'statuses'
+  | 'entities'
   | 'backups'
   | 'saving'
   | 'developer';
@@ -43,6 +46,7 @@ const SECTIONS: { id: SettingsSectionId; label: string }[] = [
   { id: 'editor', label: 'Editor' },
   { id: 'appearance', label: 'Appearance' },
   { id: 'statuses', label: 'Statuses' },
+  { id: 'entities', label: 'Entities' },
   { id: 'backups', label: 'Backups' },
   { id: 'saving', label: 'Saving' },
   { id: 'developer', label: 'Developer' },
@@ -177,6 +181,31 @@ export function SettingsDialog({ open, onClose }: Props) {
       statuses: [
         ...settings.statuses,
         { id: `status-${n}`, label: `Status ${n}`, color: '#6b7280' },
+      ],
+    });
+  };
+
+  const updateEntityType = (index: number, patch: Partial<EntityTypeDef>) => {
+    const next = settings.entityTypes.map((t, i) =>
+      i === index ? { ...t, ...patch } : t,
+    );
+    setSettings({ entityTypes: next });
+  };
+
+  const removeEntityType = (index: number) => {
+    if (settings.entityTypes.length <= 1) return;
+    setSettings({
+      entityTypes: settings.entityTypes.filter((_, i) => i !== index),
+    });
+  };
+
+  const addEntityType = () => {
+    const n = settings.entityTypes.length + 1;
+    setSettings({
+      entityTypes: [
+        ...settings.entityTypes,
+        // Empty id → settingsStore slugs a stable id from the label.
+        { id: '', label: `Type ${n}` },
       ],
     });
   };
@@ -340,8 +369,8 @@ export function SettingsDialog({ open, onClose }: Props) {
             {section === 'statuses' && (
               <section className="settings-section" aria-label="Statuses">
                 <p className="settings-field__hint">
-                  Used for project and task chips. ⌘/Ctrl+Enter cycles through
-                  this list. First status is the default for new projects/tasks.
+                  Used for task and subtask chips. ⌘/Ctrl+Enter cycles through
+                  this list. First status is the default for new tasks/subtasks.
                 </p>
                 <ul className="settings-status-list">
                   {settings.statuses.map((status, index) => (
@@ -394,6 +423,69 @@ export function SettingsDialog({ open, onClose }: Props) {
                     onClick={() =>
                       setSettings({
                         statuses: DEFAULT_STATUSES.map((s) => ({ ...s })),
+                      })
+                    }
+                  >
+                    Reset list
+                  </button>
+                </div>
+              </section>
+            )}
+
+            {section === 'entities' && (
+              <section className="settings-section" aria-label="Entities">
+                <p className="settings-field__hint">
+                  Types shown as separate multiselects when editing task/subtask
+                  attributes. Catalog values live in workspace{' '}
+                  <code>entities.json</code>. Defaults are People, Company, and
+                  Project.
+                </p>
+                <ul className="settings-entity-type-list">
+                  {settings.entityTypes.map((typeDef, index) => (
+                    <li key={typeDef.id} className="settings-entity-type-row">
+                      <input
+                        className="settings-field__control settings-entity-type-row__label"
+                        type="text"
+                        value={typeDef.label}
+                        aria-label="Entity type label"
+                        onChange={(e) =>
+                          updateEntityType(index, { label: e.target.value })
+                        }
+                      />
+                      <span
+                        className="settings-entity-type-row__id"
+                        title="Stable id used in entities.json"
+                      >
+                        {typeDef.id}
+                      </span>
+                      <button
+                        type="button"
+                        className="btn btn--danger btn--icon-sm"
+                        disabled={settings.entityTypes.length <= 1}
+                        aria-label={`Remove ${typeDef.label}`}
+                        onClick={() => removeEntityType(index)}
+                      >
+                        ×
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                <div className="settings-status-actions">
+                  <button
+                    type="button"
+                    className="btn btn--secondary btn--md"
+                    onClick={addEntityType}
+                  >
+                    Add type
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn--secondary btn--md"
+                    onClick={() =>
+                      setSettings({
+                        entityTypes: DEFAULT_ENTITY_TYPES.map((t) => ({
+                          ...t,
+                        })),
                       })
                     }
                   >

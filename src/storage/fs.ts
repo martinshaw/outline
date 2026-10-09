@@ -1,11 +1,17 @@
+import type { EntityCatalog } from '../entities/types';
 import { getSettings, sanitizeBackupDirectory } from '../settings/settingsStore';
 import type { AppSettings } from '../settings/types';
-import type { DayDocument, NotesManifest } from '../types';
+import {
+  normalizeDayDocument,
+  type DayDocument,
+  type NotesManifest,
+} from '../types';
 import { todayKey } from '../utils/date';
 import { isDayEmpty } from '../utils/outline';
 
 const NOTES_DIR = 'notes';
 const SETTINGS_FILE = 'settings.json';
+const ENTITIES_FILE = 'entities.json';
 const MANIFEST = 'manifest.json';
 const CHANGE_LOG = 'change-log.json';
 const DATE_RE = /^\d{4}-\d{2}-\d{2}\.json$/;
@@ -93,8 +99,7 @@ export async function loadDay(
 ): Promise<DayDocument | null> {
   const notes = await getNotesDir(root);
   const doc = await readJsonFile<DayDocument>(notes, `${date}.json`);
-  if (!doc || doc.version !== 1) return null;
-  return doc;
+  return normalizeDayDocument(doc);
 }
 
 async function readChangeLog(
@@ -144,7 +149,7 @@ async function backupChangedNotes(
 
   for (const noteDate of noteDates) {
     const doc = await readJsonFile<DayDocument>(notes, `${noteDate}.json`);
-    if (!doc || doc.version !== 1) continue;
+    if (!doc || (doc.version !== 1 && doc.version !== 2)) continue;
     await writeJsonFile(dayDir, `${noteDate}.json`, doc);
   }
 }
@@ -249,6 +254,20 @@ export async function saveAppSettings(
   settings: AppSettings,
 ): Promise<void> {
   await writeJsonFile(root, SETTINGS_FILE, settings);
+}
+
+/** Workspace entity catalog at the root (sibling of notes/). */
+export async function loadEntityCatalog(
+  root: FileSystemDirectoryHandle,
+): Promise<Partial<EntityCatalog> | null> {
+  return readJsonFile<Partial<EntityCatalog>>(root, ENTITIES_FILE);
+}
+
+export async function saveEntityCatalog(
+  root: FileSystemDirectoryHandle,
+  catalog: EntityCatalog,
+): Promise<void> {
+  await writeJsonFile(root, ENTITIES_FILE, catalog);
 }
 
 export type FsEntry = {

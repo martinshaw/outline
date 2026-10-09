@@ -65,12 +65,13 @@ export function $getNextOutlineSibling(
   return null;
 }
 
-export function $getNearestProjectParent(
+/** Nearest ancestor task (not subtask) — used to promote notes to subtasks. */
+export function $getNearestTaskParent(
   item: OutlineItemNode,
 ): OutlineItemNode | null {
   let parent = $getParentOutlineItem(item);
   while (parent) {
-    if (parent.getKind() === 'project') return parent;
+    if (parent.getKind() === 'task') return parent;
     parent = $getParentOutlineItem(parent);
   }
   return null;

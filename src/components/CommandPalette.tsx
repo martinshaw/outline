@@ -12,6 +12,7 @@ import {
   subscribeSettings,
 } from '../settings/settingsStore';
 import type { DayDocument } from '../types';
+import { OPEN_ITEM_META_EVENT } from '../editor/plugins/MetaAttributesPlugin';
 import {
   downloadExport,
   type ExportFormat,
@@ -28,6 +29,8 @@ type Props = {
   onChangeFolder: () => void;
   onOpenShortcuts: () => void;
   onOpenSettings: () => void;
+  onOpenTasks: () => void;
+  onOpenSearch: () => void;
   onExportMessage?: (message: string | null) => void;
 };
 
@@ -52,6 +55,7 @@ const isMac =
   typeof navigator !== 'undefined' &&
   /Mac|iPhone|iPad|iPod/i.test(navigator.platform);
 const mod = isMac ? '⌘' : 'Ctrl';
+const alt = isMac ? '⌥' : 'Alt';
 
 function scoreCommand(query: string, command: Command): number {
   const q = query.trim().toLowerCase();
@@ -98,6 +102,8 @@ export function CommandPalette({
   onChangeFolder,
   onOpenShortcuts,
   onOpenSettings,
+  onOpenTasks,
+  onOpenSearch,
   onExportMessage,
 }: Props) {
   const titleId = useId();
@@ -110,9 +116,15 @@ export function CommandPalette({
   const [developerMode, setDeveloperMode] = useState(
     () => getSettings().developerMode,
   );
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(
+    () => getSettings().sidebarCollapsed,
+  );
 
   useEffect(() => {
-    return subscribeSettings((next) => setDeveloperMode(next.developerMode));
+    return subscribeSettings((next) => {
+      setDeveloperMode(next.developerMode);
+      setSidebarCollapsed(next.sidebarCollapsed);
+    });
   }, []);
 
 
@@ -137,18 +149,52 @@ export function CommandPalette({
 
     const list: Command[] = [
       {
+        id: 'toggle-sidebar',
+        group: 'Workspace',
+        label: sidebarCollapsed
+          ? 'Show notes sidebar'
+          : 'Hide notes sidebar',
+        keywords: 'sidebar navigation drawer notes list',
+        run: () => {
+          setSettings({
+            sidebarCollapsed: !getSettings().sidebarCollapsed,
+          });
+          onClose();
+        },
+      },
+      {
         id: 'change-folder',
         group: 'Workspace',
         label: 'Change folder',
         keywords: 'directory workspace open',
         run: run(onChangeFolder),
       },
+      ...(developerMode
+        ? [
+            {
+              id: 'insert-test',
+              group: 'Workspace',
+              label: 'Insert test hierarchy',
+              keywords: 'dummy fixture sample',
+              run: run(onInsertTestHierarchy),
+            } satisfies Command,
+          ]
+        : []),
       {
-        id: 'insert-test',
+        id: 'tasks',
         group: 'Workspace',
-        label: 'Insert test hierarchy',
-        keywords: 'dummy fixture sample',
-        run: run(onInsertTestHierarchy),
+        label: 'Manage tasks',
+        hint: `${mod}${alt}T`,
+        keywords: 'task subtask table filter status deadline board',
+        run: run(onOpenTasks),
+      },
+      {
+        id: 'search',
+        group: 'Workspace',
+        label: 'Search notes',
+        hint: `${mod}${alt}F`,
+        keywords: 'find full text query filter blocks',
+        run: run(onOpenSearch),
       },
       {
         id: 'shortcuts',
@@ -162,8 +208,22 @@ export function CommandPalette({
         id: 'settings',
         group: 'Workspace',
         label: 'Settings',
+        hint: `${mod}${alt},`,
         keywords: 'preferences theme font',
         run: run(onOpenSettings),
+      },
+      {
+        id: 'edit-item-meta',
+        group: 'Workspace',
+        label: 'Edit deadline & entities',
+        hint: `${mod}${alt}A`,
+        keywords: 'attributes meta due date entities people links',
+        run: () => {
+          onClose();
+          queueMicrotask(() => {
+            window.dispatchEvent(new CustomEvent(OPEN_ITEM_META_EVENT));
+          });
+        },
       },
       {
         id: 'toggle-debug',
@@ -205,7 +265,10 @@ export function CommandPalette({
     onInsertTestHierarchy,
     onOpenSettings,
     onOpenShortcuts,
+    onOpenTasks,
+    onOpenSearch,
     runExport,
+    sidebarCollapsed,
   ]);
 
   const filtered = useMemo(() => {

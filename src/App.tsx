@@ -3,14 +3,17 @@ import { OutlineEditor } from './editor/OutlineEditor';
 import { Sidebar } from './sidebar/Sidebar';
 import { DebugOverlay } from './components/DebugOverlay';
 import { FolderGate } from './components/FolderGate';
+import { AppHints } from './components/AppHints';
 import { CommandPalette } from './components/CommandPalette';
-import { CommandPaletteTrigger } from './components/CommandPaletteTrigger';
 import { SettingsDialog } from './components/SettingsDialog';
+import { SearchDialog } from './components/SearchDialog';
 import { ShortcutsDialog } from './components/ShortcutsDialog';
+import { TasksDialog } from './components/TasksDialog';
 import { ToastHost } from './components/ToastHost';
 import { UpdateBanner } from './components/UpdateBanner';
 import { showErrorToast } from './components/toastStore';
 import { setPwaUiBlocking } from './pwa/updateStore';
+import { NotesSearchIndex } from './search/notesIndex';
 import {
   getSettings,
   setSettings,
@@ -40,6 +43,7 @@ import {
   isDayEmpty,
   sidebarDaysEqual,
 } from './utils/outline';
+import { setItemStatusInDocument } from './utils/taskIndex';
 
 type GateState =
   | { status: 'loading' }
@@ -65,12 +69,15 @@ export default function App() {
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [tasksOpen, setTasksOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const [developerMode, setDeveloperMode] = useState(
     () => getSettings().developerMode,
   );
   const [docsCache, setDocsCache] = useState<Map<string, DayDocument>>(
     () => new Map(),
   );
+  const [searchIndexRevision, setSearchIndexRevision] = useState(0);
   const [isNarrow, setIsNarrow] = useState(
     () =>
       typeof window !== 'undefined' &&
@@ -79,9 +86,25 @@ export default function App() {
   const docsCacheRef = useRef(docsCache);
   const activeDateRef = useRef(activeDate);
   const isNarrowRef = useRef(isNarrow);
+  const searchOpenRef = useRef(false);
+  const searchIndexRef = useRef(new NotesSearchIndex());
   docsCacheRef.current = docsCache;
   activeDateRef.current = activeDate;
   isNarrowRef.current = isNarrow;
+
+  const bumpSearchIndex = useCallback(() => {
+    setSearchIndexRevision((n) => n + 1);
+  }, []);
+
+  const syncSearchDay = useCallback(
+    (doc: DayDocument) => {
+      if (isDayEmpty(doc)) searchIndexRef.current.removeDay(doc.date);
+      else searchIndexRef.current.upsertDay(doc);
+      // Avoid re-rendering the app on every keystroke when search is closed.
+      if (searchOpenRef.current) bumpSearchIndex();
+    },
+    [bumpSearchIndex],
+  );
 
   useEffect(() => {
     const onOnline = () => {
@@ -125,8 +148,14 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    setPwaUiBlocking(paletteOpen || settingsOpen || shortcutsOpen);
-  }, [paletteOpen, settingsOpen, shortcutsOpen]);
+    setPwaUiBlocking(
+      paletteOpen ||
+        settingsOpen ||
+        shortcutsOpen ||
+        tasksOpen ||
+        searchOpen,
+    );
+  }, [paletteOpen, settingsOpen, shortcutsOpen, tasksOpen, searchOpen]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -161,11 +190,53 @@ export default function App() {
       ) {
         event.preventDefault();
         setShortcutsOpen(true);
+        return;
+      }
+
+      // ⌘⌥, / Ctrl+Alt+, — use code: modifiers can rewrite event.key.
+      if (
+        event.code === 'Comma' &&
+        (event.metaKey || event.ctrlKey) &&
+        event.altKey &&
+        !event.shiftKey
+      ) {
+        event.preventDefault();
+        setSettingsOpen((open) => !open);
+        return;
+      }
+
+      // ⌘⌥T / Ctrl+Alt+T — avoid browser ⌘⇧T (reopen tab) and ⌘⇧K (console).
+      // Use code: on macOS ⌥ alone can rewrite event.key (e.g. †).
+      if (
+        event.code === 'KeyT' &&
+        (event.metaKey || event.ctrlKey) &&
+        event.altKey &&
+        !event.shiftKey
+      ) {
+        event.preventDefault();
+        setTasksOpen((open) => !open);
+        return;
+      }
+
+      // ⌘⌥F / Ctrl+Alt+F — search all notes (not browser page-find ⌘F).
+      if (
+        event.code === 'KeyF' &&
+        (event.metaKey || event.ctrlKey) &&
+        event.altKey &&
+        !event.shiftKey
+      ) {
+        event.preventDefault();
+        setSearchOpen((open) => {
+          const next = !open;
+          searchOpenRef.current = next;
+          if (next) bumpSearchIndex();
+          return next;
+        });
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, []);
+  }, [bumpSearchIndex]);
 
   const bootstrapFolder = useCallback(async (handle: FileSystemDirectoryHandle) => {
     const t0 = performance.now();
@@ -202,7 +273,19 @@ export default function App() {
       `workspace ready · ${handle.name}`,
       `${index.docs.length} days · ${Math.round(performance.now() - t0)}ms`,
     );
-  }, []);
+
+    // Chunked FTS rebuild so large workspaces stay responsive.
+    void searchIndexRef.current.rebuildAsync(index.docs).then(() => {
+      bumpSearchIndex();
+      const stats = searchIndexRef.current.getStats();
+      debugLog(
+        'info',
+        'search',
+        'index ready',
+        `${stats.documents} blocks · ${stats.terms} terms · ${stats.days} days`,
+      );
+    });
+  }, [bumpSearchIndex]);
 
   useEffect(() => {
     let cancelled = false;
@@ -301,8 +384,9 @@ export default function App() {
         return next;
       });
       setSidebar((prev) => mergeSidebar(doc, prev));
+      syncSearchDay(doc);
     },
-    [mergeSidebar],
+    [mergeSidebar, syncSearchDay],
   );
 
   const handleSave = useCallback(
@@ -320,6 +404,12 @@ export default function App() {
           else next.set(doc.date, doc);
           return next;
         });
+        if (result.status === 'deleted') {
+          searchIndexRef.current.removeDay(doc.date);
+          bumpSearchIndex();
+        } else {
+          syncSearchDay(doc);
+        }
       } catch (e) {
         console.error('Save failed', e);
         const msg = e instanceof Error ? e.message : String(e);
@@ -327,7 +417,7 @@ export default function App() {
         showErrorToast(msg);
       }
     },
-    [gate, mergeSidebar],
+    [bumpSearchIndex, gate, mergeSidebar, syncSearchDay],
   );
 
   const selectDay = useCallback(
@@ -350,6 +440,7 @@ export default function App() {
         const fromDisk = await notesClient.loadDay(date);
         const doc = fromDisk ?? emptyDayDocument(date);
         setDocsCache((prev) => new Map(prev).set(date, doc));
+        syncSearchDay(doc);
         setActiveDate(date);
         setActiveDoc(doc);
         debugLog(
@@ -365,7 +456,7 @@ export default function App() {
       }
       collapseSidebarIfNarrow();
     },
-    [collapseSidebarIfNarrow],
+    [collapseSidebarIfNarrow, syncSearchDay],
   );
 
   const selectItem = useCallback(
@@ -386,23 +477,54 @@ export default function App() {
     setActiveDoc(doc);
     setDocsCache((prev) => new Map(prev).set(date, doc));
     setSidebar((prev) => mergeSidebar(doc, prev));
+    syncSearchDay(doc);
     setEditorNonce((n) => n + 1);
     debugLog('info', 'dev', 'inserted test hierarchy', doc.date);
     void handleSave(doc);
-  }, [handleSave, mergeSidebar]);
+  }, [handleSave, mergeSidebar, syncSearchDay]);
 
   const openShortcuts = useCallback(() => setShortcutsOpen(true), []);
   const openSettings = useCallback(() => setSettingsOpen(true), []);
+  const openTasks = useCallback(() => setTasksOpen(true), []);
+  const openSearch = useCallback(() => {
+    searchOpenRef.current = true;
+    bumpSearchIndex();
+    setSearchOpen(true);
+  }, [bumpSearchIndex]);
   const onExportMessage = useCallback((msg: string | null) => {
     if (msg) showErrorToast(msg);
   }, []);
   const onFocusHandled = useCallback(() => setFocusItemId(null), []);
+
+  const changeTaskStatus = useCallback(
+    async (date: string, itemId: string, status: string) => {
+      const doc = docsCacheRef.current.get(date);
+      if (!doc) return;
+      const next = setItemStatusInDocument(doc, itemId, status);
+      if (!next) return;
+      setDocsCache((prev) => new Map(prev).set(date, next));
+      setSidebar((prev) => mergeSidebar(next, prev));
+      syncSearchDay(next);
+      if (date === activeDateRef.current) {
+        setActiveDoc(next);
+        setEditorNonce((n) => n + 1);
+      }
+      debugLog('info', 'tasks', 'status', `${itemId.slice(0, 8)} → ${status}`);
+      await handleSave(next);
+    },
+    [handleSave, mergeSidebar, syncSearchDay],
+  );
 
   // Prefer live sidebar; if empty, derive from cache once.
   const displaySidebar = useMemo(() => {
     if (sidebar.length > 0) return sidebar;
     return buildSidebarFromDocs([...docsCache.values()]);
   }, [sidebar, docsCache]);
+
+  const taskDocs = useMemo(
+    () => [...docsCache.values()],
+    [docsCache],
+  );
 
   const liveDoc = docsCache.get(activeDate) ?? activeDoc;
 
@@ -440,29 +562,13 @@ export default function App() {
         sidebarCollapsed ? 'app app--sidebar-collapsed' : 'app'
       }
     >
-      <header className="topbar">
-        <div className="topbar__left">
-          <button
-            type="button"
-            className="btn btn--ghost btn--icon-sm"
-            onClick={() =>
-              setSettings({ sidebarCollapsed: !getSettings().sidebarCollapsed })
-            }
-            aria-expanded={!sidebarCollapsed}
-            aria-label={
-              sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'
-            }
-            title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          >
-            {sidebarCollapsed ? '☰' : '☰'}
-          </button>
-          <div className="topbar__brand">Outline</div>
-        </div>
-        <div className="topbar__meta">
-          {offline && <span className="topbar__offline">Offline</span>}
-          <CommandPaletteTrigger onOpen={() => setPaletteOpen(true)} />
-        </div>
-      </header>
+      <AppHints
+        onOpenPalette={() => setPaletteOpen(true)}
+        onOpenShortcuts={openShortcuts}
+        onOpenSettings={openSettings}
+        onOpenTasks={openTasks}
+        onOpenSearch={openSearch}
+      />
       <div className="app__body">
         {!sidebarCollapsed && isNarrow && (
           <button
@@ -517,6 +623,8 @@ export default function App() {
         onChangeFolder={openFolder}
         onOpenShortcuts={openShortcuts}
         onOpenSettings={openSettings}
+        onOpenTasks={openTasks}
+        onOpenSearch={openSearch}
         onExportMessage={onExportMessage}
       />
       <ShortcutsDialog
@@ -526,6 +634,23 @@ export default function App() {
       <SettingsDialog
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
+      />
+      <TasksDialog
+        open={tasksOpen}
+        onClose={() => setTasksOpen(false)}
+        docs={taskDocs}
+        onSelectItem={selectItem}
+        onChangeStatus={changeTaskStatus}
+      />
+      <SearchDialog
+        open={searchOpen}
+        onClose={() => {
+          searchOpenRef.current = false;
+          setSearchOpen(false);
+        }}
+        index={searchIndexRef.current}
+        indexRevision={searchIndexRevision}
+        onSelectItem={selectItem}
       />
     </div>
   );

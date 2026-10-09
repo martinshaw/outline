@@ -51,6 +51,8 @@ function isGutterClick(event: MouseEvent, dom: HTMLElement): boolean {
   if (
     event.target.closest('.outline-status-chip') ||
     event.target.closest('.outline-status-menu') ||
+    event.target.closest('.outline-meta') ||
+    event.target.closest('.outline-meta-popover') ||
     event.target.closest('.outline-block-handle')
   ) {
     return false;

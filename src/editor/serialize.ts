@@ -12,13 +12,16 @@ import {
   $isLinkNode,
 } from '@lexical/link';
 import { getDefaultStatusId } from '../settings/settingsStore';
-import type {
-  DayDocument,
-  HeadingLevel,
-  InlineSegment,
-  OutlineItem,
+import {
+  DAY_DOCUMENT_VERSION,
+  isRoleKind,
+  type DayDocument,
+  type HeadingLevel,
+  type InlineSegment,
+  type OutlineItem,
 } from '../types';
 import { createId } from '../utils/id';
+import { isIsoDate, normalizeEntities } from '../utils/itemMeta';
 import {
   $createOutlineItemNode,
   $isOutlineItemNode,
@@ -91,11 +94,14 @@ function outlineItemToData(node: OutlineItemNode): OutlineItem {
   }
   const kind = node.getKind();
   const headingLevel = node.getHeadingLevel();
+  const isRole = isRoleKind(kind);
   return {
     id: node.getId(),
     kind,
     headingLevel: kind === 'heading' ? headingLevel : null,
-    status: kind === 'project' || kind === 'task' ? node.getStatus() : null,
+    status: isRole ? node.getStatus() : null,
+    deadline: isRole ? node.getDeadline() : null,
+    entities: isRole ? node.getEntities() : [],
     content: contentNodesToSegments(contentChildren),
     children: nested.map(outlineItemToData),
   };
@@ -110,7 +116,7 @@ export function editorToDayDocument(
     const root = $getRoot();
     items = root.getChildren().filter($isOutlineItemNode).map(outlineItemToData);
   });
-  return { version: 1, date, items };
+  return { version: DAY_DOCUMENT_VERSION, date, items };
 }
 
 function segmentsToNodes(segments: InlineSegment[]): LexicalNode[] {
@@ -134,21 +140,30 @@ function segmentsToNodes(segments: InlineSegment[]): LexicalNode[] {
 
 function dataToOutlineItem(item: OutlineItem): OutlineItemNode {
   const kind = item.kind;
-  const status =
-    kind === 'project' || kind === 'task'
-      ? (item.status ?? getDefaultStatusId())
-      : null;
+  const status = isRoleKind(kind)
+    ? (item.status ?? getDefaultStatusId())
+    : null;
   const headingLevel: HeadingLevel | null =
     kind === 'heading'
       ? (item.headingLevel && item.headingLevel >= 1 && item.headingLevel <= 6
           ? item.headingLevel
           : 1)
       : null;
+  const deadline = isRoleKind(kind)
+    ? item.deadline && isIsoDate(item.deadline)
+      ? item.deadline
+      : null
+    : null;
+  const entities = isRoleKind(kind)
+    ? normalizeEntities(item.entities ?? item.people)
+    : [];
   const node = $createOutlineItemNode(
     item.id || createId(),
     kind,
     status,
     headingLevel,
+    deadline,
+    entities,
   );
   node.append(...segmentsToNodes(item.content));
   for (const child of item.children) {

@@ -1,9 +1,10 @@
-import type {
-  DayDocument,
-  InlineMark,
-  InlineSegment,
-  ItemKind,
-  OutlineItem,
+import {
+  DAY_DOCUMENT_VERSION,
+  type DayDocument,
+  type InlineMark,
+  type InlineSegment,
+  type ItemKind,
+  type OutlineItem,
 } from '../types';
 import { createId } from './id';
 
@@ -20,7 +21,7 @@ function item(
   return {
     id: createId(),
     kind,
-    status: kind === 'project' || kind === 'task' ? 'todo' : null,
+    status: kind === 'task' || kind === 'subtask' ? 'todo' : null,
     content: text(title, format),
     children,
   };
@@ -29,7 +30,7 @@ function item(
 /** Large multi-level outline for keyboard / indent / move testing. */
 export function createDummyHierarchy(date: string): DayDocument {
   return {
-    version: 1,
+    version: DAY_DOCUMENT_VERSION,
     date,
     items: [
       item('note', 'Morning notes', [
@@ -41,15 +42,15 @@ export function createDummyHierarchy(date: string): DayDocument {
         ]),
       ]),
 
-      item('project', 'Auth refactor', [
+      item('task', 'Auth refactor', [
         item('note', 'Context: migrate session cookies to opaque tokens'),
-        item('task', 'Map current auth middleware call sites', [
+        item('subtask', 'Map current auth middleware call sites', [
           item('note', 'api/gateway'),
           item('note', 'api/admin'),
           item('note', 'workers/session-janitor'),
         ]),
-        item('task', 'Draft token refresh flow'),
-        item('task', 'Fix redirect loop on expired session', [
+        item('subtask', 'Draft token refresh flow'),
+        item('subtask', 'Fix redirect loop on expired session', [
           item('note', 'Repro: open two tabs, expire one'),
           item('note', 'Expected: soft re-auth, keep draft'),
         ]),
@@ -59,13 +60,13 @@ export function createDummyHierarchy(date: string): DayDocument {
         ]),
       ]),
 
-      item('project', 'Outline editor polish', [
-        item('task', 'Enter on empty indented item outdents'),
-        item('task', 'Cmd/Alt+Shift move matches LogSeq tree walk', [
+      item('task', 'Outline editor polish', [
+        item('subtask', 'Enter on empty indented item outdents'),
+        item('subtask', 'Cmd/Alt+Shift move matches LogSeq tree walk', [
           item('note', 'First child up → last child of uncle'),
           item('note', 'Last child down → first child of aunt'),
         ]),
-        item('task', 'Logical outdent adopts following siblings'),
+        item('subtask', 'Logical outdent adopts following siblings'),
         item('note', 'Deep nest for stress', [
           item('note', 'Level 2', [
             item('note', 'Level 3', [
@@ -83,10 +84,10 @@ export function createDummyHierarchy(date: string): DayDocument {
         ]),
       ]),
 
-      item('project', 'Infra / deploy', [
-        item('task', 'Wire preview deploys to PRs'),
-        item('task', 'Document Chrome folder-permission flow'),
-        item('note', 'Notes only — not a task'),
+      item('task', 'Infra / deploy', [
+        item('subtask', 'Wire preview deploys to PRs'),
+        item('subtask', 'Document Chrome folder-permission flow'),
+        item('note', 'Notes only — not a subtask'),
       ]),
 
       item('note', 'Sibling block A (top level)'),
