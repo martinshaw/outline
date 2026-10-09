@@ -106,7 +106,9 @@ export function normalizeDayDocument(
   partial: Partial<DayDocument> & { version?: number } | null | undefined,
 ): DayDocument | null {
   if (!partial || typeof partial !== 'object') return null;
-  const version = typeof partial.version === 'number' ? partial.version : 0;
+  // Widen: DayDocument.version is literal `2`, but disk may still send `1`.
+  const version: number =
+    typeof partial.version === 'number' ? partial.version : 0;
   if (version !== 1 && version !== 2) return null;
   if (typeof partial.date !== 'string' || !partial.date) return null;
   const items = Array.isArray(partial.items) ? partial.items : [];

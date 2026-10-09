@@ -148,8 +148,12 @@ async function backupChangedNotes(
   const dayDir = await backups.getDirectoryHandle(changeDay, { create: true });
 
   for (const noteDate of noteDates) {
-    const doc = await readJsonFile<DayDocument>(notes, `${noteDate}.json`);
-    if (!doc || (doc.version !== 1 && doc.version !== 2)) continue;
+    const doc = await readJsonFile<{ version?: number }>(
+      notes,
+      `${noteDate}.json`,
+    );
+    const version = typeof doc?.version === 'number' ? doc.version : 0;
+    if (!doc || (version !== 1 && version !== 2)) continue;
     await writeJsonFile(dayDir, `${noteDate}.json`, doc);
   }
 }
