@@ -30,3 +30,5 @@ Whenever you create or push a version tag (`v*`) as part of a release:
 7. If `CHANGELOG.md` is missing, create it with a one-line intro then the historical sections (rebuild from past release PRs via `gh` when bootstrapping).
 
 Tagging without updating the changelog is incorrect for this repo.
+
+The `GitHub Release` workflow (`.github/workflows/release.yml`) publishes a GitHub Release for each `v*` tag using that version’s `CHANGELOG.md` section as the release body.

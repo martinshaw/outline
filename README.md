@@ -579,7 +579,9 @@ Selection export requires at least one block selected.
 
 CI installs dependencies, runs **`npm test`**, then builds and deploys on pushes to `main` / `master`, on version tags (`v*`), and via **workflow_dispatch**. Failed tests block the deploy.
 
-- Workflow: [`.github/workflows/deploy-pages.yml`](.github/workflows/deploy-pages.yml)
+Pushing a **`v*`** tag also creates a [GitHub Release](https://github.com/martinshaw/outline/releases) whose notes are taken from that version’s section in `CHANGELOG.md`.
+
+- Workflows: [`.github/workflows/deploy-pages.yml`](.github/workflows/deploy-pages.yml), [`.github/workflows/release.yml`](.github/workflows/release.yml)
 - Site: https://martinshaw.github.io/outline/
 
 Enable **Settings → Pages → GitHub Actions** as the source. The `github-pages` environment should allow the `master` (or `main`) branch and optionally `v*` tags.
