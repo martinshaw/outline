@@ -1,0 +1,32 @@
+---
+description: Keep CHANGELOG.md updated from merged PR descriptions whenever creating a version tag
+alwaysApply: true
+---
+
+# Changelog on tag
+
+Whenever you create or push a version tag (`v*`) as part of a release:
+
+1. **Update `CHANGELOG.md` in the same release commit** (before tagging), never as a follow-up after the tag exists unless the user asks to amend.
+2. **Source notes from GitHub PR descriptions**, not commit subjects alone:
+   - Prefer the merged release PR for this version (title like `Release Outline X.Y.Z`).
+   - Also fold in any other PRs merged to `master`/`main` since the previous version tag.
+   - Use `gh pr list --state merged` / `gh pr view <n> --json title,body,mergedAt,number`.
+3. **Extract the `## Summary` bullets** from each PR body. Drop Test plan, checklist noise, and “Made with Cursor” footers. Rephrase lightly for readability if needed; keep the substance of the PR notes.
+4. **Prepend a new section** at the top of `CHANGELOG.md` (newest first):
+
+```markdown
+## X.Y.Z — YYYY-MM-DD
+
+- Note from PR summary…
+- …
+```
+
+   - Version matches `package.json` / tag without the leading `v`.
+   - Date is the merge (or tag) date in ISO `YYYY-MM-DD`.
+   - Optionally cite PRs as `(#N)` at the end of a bullet or under the heading.
+5. **Non-release PRs** (CI, docs-only) may be omitted or grouped under a short “Other” bullet if they matter to operators.
+6. **Do not invent features** that are not in a PR description or the release diff.
+7. If `CHANGELOG.md` is missing, create it with a one-line intro then the historical sections (rebuild from past release PRs via `gh` when bootstrapping).
+
+Tagging without updating the changelog is incorrect for this repo.
