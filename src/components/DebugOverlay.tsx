@@ -53,6 +53,7 @@ function collectStats(doc: DayDocument): ItemStats {
     task: 0,
     subtask: 0,
     heading: 0,
+    attachment: 0,
   };
   const byStatus: Record<string, number> = {};
   let total = 0;

@@ -68,6 +68,9 @@ function buildItemSearchText(item: OutlineItem): {
   const entities = item.entities ?? item.people ?? [];
   if (entities.length) parts.push(resolveEntityLabels(entities).join(' '));
   if (item.kind !== 'note') parts.push(item.kind);
+  if (item.kind === 'attachment' && item.attachment) {
+    parts.push(item.attachment.name, item.attachment.path, item.attachment.mime);
+  }
   return { text, boostText: parts.join(' ') };
 }
 

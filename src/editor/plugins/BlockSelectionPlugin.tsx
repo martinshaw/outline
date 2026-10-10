@@ -14,8 +14,10 @@ import {
   clearBlockSelectedIds,
   disposeBlockDragHandles,
   getBlockSelectedIds,
+  isBlockSelfOnly,
   refreshBlockSelectionChrome,
   setBlockSelectedIds,
+  setBlockSelfOnlyIds,
   subscribeBlockSelection,
   syncBlockDragHandles,
   syncBlockSelectionDom,
@@ -53,14 +55,24 @@ function isGutterClick(event: MouseEvent, dom: HTMLElement): boolean {
     event.target.closest('.outline-status-menu') ||
     event.target.closest('.outline-meta') ||
     event.target.closest('.outline-meta-popover') ||
+    event.target.closest('.outline-attachment') ||
+    event.target.closest('.outline-attachment-menu') ||
+    event.target.closest('.outline-attachment-lightbox') ||
     event.target.closest('.outline-block-handle')
   ) {
     return false;
   }
+  // Real text/content under the row — never treat as gutter (keeps text
+  // selection at the start of the line). Padding / bullet hits `dom` itself
+  // because label/bullet are CSS pseudos.
+  if (event.target !== dom && event.target.tagName !== 'BR') {
+    return false;
+  }
   const rect = dom.getBoundingClientRect();
-  // Leading gutter (kind label + bullet + gap) before chip/text.
-  // Bullet/label are CSS pseudo-elements, so hit-test by x only.
-  return event.clientX - rect.left < 72;
+  // Match each row’s real leading pad (nested rows are much narrower than root),
+  // inset a few px so the first text glyphs stay in the text-select zone.
+  const pad = parseFloat(getComputedStyle(dom).paddingLeft) || 0;
+  return event.clientX - rect.left < Math.max(0, pad - 5);
 }
 
 function outlineIdFromTarget(target: EventTarget | null): string | null {
@@ -221,6 +233,32 @@ export function BlockSelectionPlugin(): null {
       scheduleHandleRefresh();
     });
 
+    let gutterEl: HTMLElement | null = null;
+    const clearGutterCursor = () => {
+      gutterEl?.classList.remove('outline-item--gutter-cursor');
+      gutterEl = null;
+    };
+    const onGutterCursorMove = (event: MouseEvent) => {
+      if (mode.current !== 'idle') {
+        clearGutterCursor();
+        return;
+      }
+      if (findDragHandle(event.target)) {
+        clearGutterCursor();
+        return;
+      }
+      const dom = findOutlineDom(event.target);
+      if (dom && isGutterClick(event, dom)) {
+        if (gutterEl !== dom) {
+          clearGutterCursor();
+          dom.classList.add('outline-item--gutter-cursor');
+          gutterEl = dom;
+        }
+        return;
+      }
+      clearGutterCursor();
+    };
+
     const root = editor.getRootElement();
     const shell = root?.closest('.editor-shell');
     const main = root?.closest('.main');
@@ -236,17 +274,33 @@ export function BlockSelectionPlugin(): null {
     main?.addEventListener('scroll', onScrollOrResize, { passive: true });
     window.addEventListener('resize', onScrollOrResize);
 
+    const removeRootListener = editor.registerRootListener((rootEl, prev) => {
+      if (prev) {
+        prev.removeEventListener('mousemove', onGutterCursorMove);
+        prev.removeEventListener('mouseleave', clearGutterCursor);
+      }
+      clearGutterCursor();
+      if (rootEl) {
+        rootEl.addEventListener('mousemove', onGutterCursorMove, {
+          passive: true,
+        });
+        rootEl.addEventListener('mouseleave', clearGutterCursor);
+      }
+    });
+
     paint();
 
     return () => {
       unsub();
       removeUpdate();
+      removeRootListener();
       if (paintRaf != null) cancelAnimationFrame(paintRaf);
       if (textSyncRaf != null) cancelAnimationFrame(textSyncRaf);
       if (handleRaf != null) cancelAnimationFrame(handleRaf);
       shell?.removeEventListener('scroll', onScrollOrResize, true);
       main?.removeEventListener('scroll', onScrollOrResize);
       window.removeEventListener('resize', onScrollOrResize);
+      clearGutterCursor();
       disposeBlockDragHandles();
     };
   }, [editor]);
@@ -327,9 +381,22 @@ export function BlockSelectionPlugin(): null {
         const anchor = existing[0] ?? id;
         dragAnchorId.current = anchor;
         applyRange(anchor, id);
+        setBlockSelfOnlyIds([]);
+      } else if (
+        selected.has(id) &&
+        selected.size === 1 &&
+        dom.querySelector(':scope > .outline-item')
+      ) {
+        // Second click on a selected parent: toggle “self-only” so moves
+        // leave nested children behind. Third click restores subtree moves.
+        event.preventDefault();
+        setBlockSelfOnlyIds(isBlockSelfOnly(id) ? [] : [id]);
+        mode.current = 'idle';
+        setDraggingClass(false);
       } else {
         dragAnchorId.current = id;
         setBlockSelectedIds([id]);
+        setBlockSelfOnlyIds([]);
       }
     };
 
@@ -497,7 +564,10 @@ export function BlockSelectionPlugin(): null {
           if (event.detail === 3) {
             event.preventDefault();
             const id = outlineIdFromTarget(event.target);
-            if (id) setBlockSelectedIds([id]);
+            if (id) {
+              setBlockSelectedIds([id]);
+              setBlockSelfOnlyIds([]);
+            }
             return true;
           }
 

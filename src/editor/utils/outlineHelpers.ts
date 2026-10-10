@@ -5,7 +5,10 @@ import {
   type ElementNode,
   type LexicalNode,
 } from 'lexical';
-import { getBlockSelectedIds } from '../blockSelectionStore';
+import {
+  getBlockSelectedIds,
+  getBlockSelfOnlyIds,
+} from '../blockSelectionStore';
 import {
   $isOutlineItemNode,
   OutlineItemNode,
@@ -422,6 +425,30 @@ function $insertAllAfter(ref: OutlineItemNode, nodes: OutlineItemNode[]): void {
 }
 
 /**
+ * Lift nested outline children out of `item`, placing them as following
+ * siblings (order preserved). Used when moving a parent alone.
+ */
+export function $hoistNestedChildren(item: OutlineItemNode): void {
+  const nested = $getNestedItems(item);
+  if (nested.length === 0) return;
+  let anchor: OutlineItemNode = item;
+  for (const child of nested) {
+    child.remove();
+    anchor.insertAfter(child);
+    anchor = child;
+  }
+}
+
+/** For self-only selection, detach nested outline children before a move. */
+export function $hoistSelfOnlyMoveTargets(targets: OutlineItemNode[]): void {
+  const selfOnly = getBlockSelfOnlyIds();
+  if (selfOnly.size === 0) return;
+  for (const t of targets) {
+    if (selfOnly.has(t.getId())) $hoistNestedChildren(t);
+  }
+}
+
+/**
  * Move top-level selected outline items before/after `dropTarget`, adopting
  * that item's parent (nesting level). Returns false if the drop is invalid.
  */
@@ -432,7 +459,12 @@ export function $relocateOutlineItems(
 ): boolean {
   if (targets.length === 0 || !$sameParent(targets)) return false;
   if (targets.includes(dropTarget)) return false;
+
+  // Self-only parents hoist children first, so drops onto those (soon-former)
+  // descendants are valid. Full subtree moves still cannot land inside themselves.
+  const selfOnly = getBlockSelfOnlyIds();
   for (const t of targets) {
+    if (selfOnly.has(t.getId())) continue;
     if ($isDescendantOf(dropTarget, t)) return false;
   }
 
@@ -446,8 +478,113 @@ export function $relocateOutlineItems(
     if (next === targets[0]) return false;
   }
 
+  $hoistSelfOnlyMoveTargets(targets);
   for (const t of targets) t.remove();
   if (place === 'before') $insertAllBefore(dropTarget, targets);
   else $insertAllAfter(dropTarget, targets);
+  return true;
+}
+
+function $detachAll(nodes: OutlineItemNode[]): void {
+  for (const n of nodes) n.remove();
+}
+
+/** Nest targets under the previous outline sibling. */
+export function $indentOutlineItems(targets: OutlineItemNode[]): boolean {
+  if (targets.length === 0 || !$sameParent(targets)) return false;
+  const prev = $getPreviousOutlineSibling(targets[0]);
+  if (!prev || targets.includes(prev)) return false;
+  $hoistSelfOnlyMoveTargets(targets);
+  $detachAll(targets);
+  for (const t of targets) prev.append(t);
+  return true;
+}
+
+/**
+ * Lift targets to the parent level (after their current parent). Trailing
+ * siblings between the last target and the next non-target are adopted as
+ * children of the last target.
+ */
+export function $outdentOutlineItems(targets: OutlineItemNode[]): boolean {
+  if (targets.length === 0 || !$sameParent(targets)) return false;
+  const parent = $getParentOutlineItem(targets[0]);
+  if (!parent) return false;
+
+  const last = targets[targets.length - 1];
+  const adopted: OutlineItemNode[] = [];
+  let sibling = $getNextOutlineSibling(last);
+  while (sibling) {
+    if (targets.includes(sibling)) break;
+    const next = $getNextOutlineSibling(sibling);
+    adopted.push(sibling);
+    sibling = next;
+  }
+
+  const parentParent = parent.getParent();
+  const parentIndex = parent.getIndexWithinParent();
+
+  $hoistSelfOnlyMoveTargets(targets);
+  $detachAll(adopted);
+  $detachAll(targets);
+
+  if (parentParent) {
+    (parentParent as ElementNode).splice(parentIndex + 1, 0, targets);
+  } else {
+    $insertAllAfter(parent, targets);
+  }
+
+  for (const s of adopted) last.append(s);
+  return true;
+}
+
+/** Move targets up among siblings, or out before the parent when at top. */
+export function $moveOutlineItemsUp(targets: OutlineItemNode[]): boolean {
+  if (targets.length === 0 || !$sameParent(targets)) return false;
+  const first = targets[0];
+  // Hoist first so self-only parents see former children as siblings.
+  $hoistSelfOnlyMoveTargets(targets);
+  const prev = $getPreviousOutlineSibling(first);
+
+  if (prev && !targets.includes(prev)) {
+    $detachAll(targets);
+    $insertAllBefore(prev, targets);
+    return true;
+  }
+
+  const parent = $getParentOutlineItem(first);
+  if (!parent) return false;
+  $detachAll(targets);
+  $insertAllBefore(parent, targets);
+  return true;
+}
+
+/** Move targets down among siblings, or into/after the next aunt. */
+export function $moveOutlineItemsDown(targets: OutlineItemNode[]): boolean {
+  if (targets.length === 0 || !$sameParent(targets)) return false;
+  const last = targets[targets.length - 1];
+  // Hoist first so self-only parents see former children as siblings.
+  $hoistSelfOnlyMoveTargets(targets);
+  const next = $getNextOutlineSibling(last);
+
+  if (next && !targets.includes(next)) {
+    $detachAll(targets);
+    $insertAllAfter(next, targets);
+    return true;
+  }
+
+  const parent = $getParentOutlineItem(targets[0]);
+  if (!parent) return false;
+
+  const aunt = $getNextOutlineSibling(parent);
+  if (aunt) {
+    $detachAll(targets);
+    const nested = $getNestedItems(aunt);
+    if (nested.length > 0) $insertAllBefore(nested[0], targets);
+    else for (const t of targets) aunt.append(t);
+    return true;
+  }
+
+  $detachAll(targets);
+  $insertAllAfter(parent, targets);
   return true;
 }

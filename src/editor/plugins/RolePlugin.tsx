@@ -38,6 +38,9 @@ function $cycleStatusOrDemote(item: OutlineItemNode): void {
 function $promoteOrCycle(item: OutlineItemNode): void {
   const kind = item.getKind();
 
+  // Attachments keep their file payload — don't convert to task/note.
+  if (kind === 'attachment') return;
+
   if (isRoleKind(kind)) {
     $cycleStatusOrDemote(item);
     return;

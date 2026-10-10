@@ -8,6 +8,12 @@ import {
 } from '../types';
 import { todayKey } from '../utils/date';
 import { isDayEmpty } from '../utils/outline';
+import {
+  ATTACHMENTS_DIR,
+  buildAttachmentFilename,
+  isSafeAttachmentPath,
+  type AttachmentMeta,
+} from './attachments';
 
 const NOTES_DIR = 'notes';
 const SETTINGS_FILE = 'settings.json';
@@ -272,6 +278,62 @@ export async function saveEntityCatalog(
   catalog: EntityCatalog,
 ): Promise<void> {
   await writeJsonFile(root, ENTITIES_FILE, catalog);
+}
+
+async function getAttachmentsDir(
+  root: FileSystemDirectoryHandle,
+): Promise<FileSystemDirectoryHandle> {
+  return root.getDirectoryHandle(ATTACHMENTS_DIR, { create: true });
+}
+
+/** Persist a dropped/pasted file under `attachments/` and return metadata. */
+export async function writeAttachment(
+  root: FileSystemDirectoryHandle,
+  file: File,
+): Promise<AttachmentMeta> {
+  const dir = await getAttachmentsDir(root);
+  const filename = buildAttachmentFilename(file);
+  const path = `${ATTACHMENTS_DIR}/${filename}`;
+  const handle = await dir.getFileHandle(filename, { create: true });
+  const writable = await handle.createWritable();
+  await writable.write(file);
+  await writable.close();
+  return {
+    path,
+    mime: file.type || 'application/octet-stream',
+    name: file.name || filename,
+    size: file.size,
+  };
+}
+
+/** Read an attachment blob by workspace-relative path. */
+export async function readAttachment(
+  root: FileSystemDirectoryHandle,
+  path: string,
+): Promise<Blob | null> {
+  if (!isSafeAttachmentPath(path)) return null;
+  const filename = path.slice(ATTACHMENTS_DIR.length + 1);
+  try {
+    const dir = await getAttachmentsDir(root);
+    const handle = await dir.getFileHandle(filename);
+    return await handle.getFile();
+  } catch {
+    return null;
+  }
+}
+
+export async function deleteAttachment(
+  root: FileSystemDirectoryHandle,
+  path: string,
+): Promise<void> {
+  if (!isSafeAttachmentPath(path)) return;
+  const filename = path.slice(ATTACHMENTS_DIR.length + 1);
+  try {
+    const dir = await getAttachmentsDir(root);
+    await dir.removeEntry(filename);
+  } catch {
+    // already gone
+  }
 }
 
 export type FsEntry = {

@@ -12,6 +12,13 @@ import type { DayDocument, SidebarDay } from '../types';
 import { buildSidebarFromDocs } from '../utils/outline';
 import { isDebugEnabled } from './debugStore';
 import {
+  getCachedAttachmentUrl,
+  revokeAttachmentUrl,
+  setCachedAttachmentUrl,
+  type AttachmentMeta,
+} from './attachments';
+import {
+  deleteAttachment as fsDeleteAttachment,
   deleteDay as fsDeleteDay,
   getFolderName,
   listDirectoryEntries,
@@ -19,9 +26,11 @@ import {
   loadAppSettings,
   loadEntityCatalog,
   loadDay as fsLoadDay,
+  readAttachment as fsReadAttachment,
   saveAppSettings,
   saveEntityCatalog,
   saveDay as fsSaveDay,
+  writeAttachment as fsWriteAttachment,
   type FsEntry,
 } from './fs';
 
@@ -105,6 +114,30 @@ class NotesClient {
   async listDirectory(path: string[] = []): Promise<FsEntry[]> {
     if (!isDebugEnabled()) return [];
     return listDirectoryEntries(this.requireRoot(), path);
+  }
+
+  async writeAttachment(file: File): Promise<AttachmentMeta> {
+    return fsWriteAttachment(this.requireRoot(), file);
+  }
+
+  async readAttachment(path: string): Promise<Blob | null> {
+    return fsReadAttachment(this.requireRoot(), path);
+  }
+
+  /** Object URL for preview; cached until revoked. */
+  async getAttachmentObjectUrl(path: string): Promise<string | null> {
+    const cached = getCachedAttachmentUrl(path);
+    if (cached) return cached;
+    const blob = await this.readAttachment(path);
+    if (!blob) return null;
+    const url = URL.createObjectURL(blob);
+    setCachedAttachmentUrl(path, url);
+    return url;
+  }
+
+  async deleteAttachment(path: string): Promise<void> {
+    revokeAttachmentUrl(path);
+    await fsDeleteAttachment(this.requireRoot(), path);
   }
 }
 
