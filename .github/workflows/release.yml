@@ -1,0 +1,47 @@
+name: GitHub Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build release notes from CHANGELOG
+        id: notes
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          NOTES="$(mktemp)"
+          awk -v ver="$VERSION" '
+            $0 ~ "^## " ver "( —| |$)" { found = 1; next }
+            found && /^## / { exit }
+            found { print }
+          ' CHANGELOG.md > "$NOTES"
+          if ! grep -q '[^[:space:]]' "$NOTES"; then
+            echo "No CHANGELOG section for ${VERSION}; using tag message fallback." >&2
+            {
+              echo "Outline ${VERSION}"
+              echo
+              echo "See [CHANGELOG.md](https://github.com/${GITHUB_REPOSITORY}/blob/${GITHUB_REF_NAME}/CHANGELOG.md)."
+            } > "$NOTES"
+          fi
+          echo "path=$NOTES" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release create "$GITHUB_REF_NAME" \
+            --title "Outline ${{ steps.notes.outputs.version }}" \
+            --notes-file "${{ steps.notes.outputs.path }}" \
+            --verify-tag
