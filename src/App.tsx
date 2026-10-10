@@ -1,14 +1,17 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { OutlineEditor } from './editor/OutlineEditor';
 import { Sidebar } from './sidebar/Sidebar';
-import { DebugOverlay } from './components/DebugOverlay';
 import { FolderGate } from './components/FolderGate';
 import { AppHints } from './components/AppHints';
-import { CommandPalette } from './components/CommandPalette';
-import { SettingsDialog } from './components/SettingsDialog';
-import { SearchDialog } from './components/SearchDialog';
-import { ShortcutsDialog } from './components/ShortcutsDialog';
-import { TasksDialog } from './components/TasksDialog';
+import { EmptyDocHints } from './components/EmptyDocHints';
 import { ToastHost } from './components/ToastHost';
 import { UpdateBanner } from './components/UpdateBanner';
 import { showErrorToast } from './components/toastStore';
@@ -51,6 +54,33 @@ import {
 } from './utils/subtaskCompletion';
 import { setItemStatusInDocument } from './utils/taskIndex';
 
+const CommandPalette = lazy(async () => {
+  const m = await import('./components/CommandPalette');
+  return { default: m.CommandPalette };
+});
+const SettingsDialog = lazy(async () => {
+  const m = await import('./components/SettingsDialog');
+  return { default: m.SettingsDialog };
+});
+const SearchDialog = lazy(async () => {
+  const m = await import('./components/SearchDialog');
+  return { default: m.SearchDialog };
+});
+const ShortcutsDialog = lazy(async () => {
+  const m = await import('./components/ShortcutsDialog');
+  return { default: m.ShortcutsDialog };
+});
+const TasksDialog = lazy(async () => {
+  const m = await import('./components/TasksDialog');
+  return { default: m.TasksDialog };
+});
+const DebugOverlay = lazy(async () => {
+  const m = await import('./components/DebugOverlay');
+  return { default: m.DebugOverlay };
+});
+
+const EMPTY_HINTS_MS = 60 * 1000;
+
 type GateState =
   | { status: 'loading' }
   | { status: 'need-folder' }
@@ -80,6 +110,9 @@ export default function App() {
   const [developerMode, setDeveloperMode] = useState(
     () => getSettings().developerMode,
   );
+  const [emptyHintsVisible, setEmptyHintsVisible] = useState(false);
+  const [emptyHintsTypingStarted, setEmptyHintsTypingStarted] = useState(false);
+  const [focusFirstLineKey, setFocusFirstLineKey] = useState(0);
   const [docsCache, setDocsCache] = useState<Map<string, DayDocument>>(
     () => new Map(),
   );
@@ -91,11 +124,13 @@ export default function App() {
   );
   const docsCacheRef = useRef(docsCache);
   const activeDateRef = useRef(activeDate);
+  const activeDocRef = useRef(activeDoc);
   const isNarrowRef = useRef(isNarrow);
   const searchOpenRef = useRef(false);
   const searchIndexRef = useRef(new NotesSearchIndex());
   docsCacheRef.current = docsCache;
   activeDateRef.current = activeDate;
+  activeDocRef.current = activeDoc;
   isNarrowRef.current = isNarrow;
 
   const bumpSearchIndex = useCallback(() => {
@@ -147,6 +182,46 @@ export default function App() {
       setSidebarCollapsed(next.sidebarCollapsed);
       setDeveloperMode(next.developerMode);
     });
+  }, []);
+
+  // Show get-started tips when landing on an empty day.
+  useEffect(() => {
+    if (gate.status !== 'ready') return;
+    const doc = docsCacheRef.current.get(activeDate) ?? activeDocRef.current;
+    if (isDayEmpty(doc)) {
+      setEmptyHintsVisible(true);
+      setEmptyHintsTypingStarted(false);
+      setFocusFirstLineKey((k) => k + 1);
+    } else {
+      setEmptyHintsVisible(false);
+      setEmptyHintsTypingStarted(false);
+    }
+  }, [activeDate, editorNonce, gate.status]);
+
+  // Start the dismiss clock on first keystroke, not idle wall time.
+  useEffect(() => {
+    if (!emptyHintsVisible || emptyHintsTypingStarted) return;
+    if (isDayEmpty(activeDoc)) return;
+    setEmptyHintsTypingStarted(true);
+  }, [emptyHintsVisible, emptyHintsTypingStarted, activeDoc]);
+
+  useEffect(() => {
+    if (!emptyHintsVisible || !emptyHintsTypingStarted) return;
+    const timer = window.setTimeout(() => {
+      setEmptyHintsVisible(false);
+    }, EMPTY_HINTS_MS);
+    return () => window.clearTimeout(timer);
+  }, [emptyHintsVisible, emptyHintsTypingStarted, activeDate]);
+
+  const dismissEmptyHints = useCallback(() => {
+    setEmptyHintsVisible(false);
+    setEmptyHintsTypingStarted(false);
+  }, []);
+
+  const showEmptyHints = useCallback(() => {
+    setEmptyHintsVisible(true);
+    setEmptyHintsTypingStarted(false);
+    setFocusFirstLineKey((k) => k + 1);
   }, []);
 
   const collapseSidebarIfNarrow = useCallback(() => {
@@ -292,7 +367,7 @@ export default function App() {
         'info',
         'search',
         'index ready',
-        `${stats.documents} blocks · ${stats.terms} terms · ${stats.days} days`,
+        `${stats.documents} items · ${stats.terms} terms · ${stats.days} days`,
       );
     });
   }, [bumpSearchIndex]);
@@ -649,11 +724,15 @@ export default function App() {
         />
         <main className="main">
           <h1 className="main__day">{formatDayLabel(activeDate)}</h1>
+          {emptyHintsVisible && (
+            <EmptyDocHints onDismiss={dismissEmptyHints} />
+          )}
           <OutlineEditor
             key={`${activeDate}-${editorNonce}`}
             date={activeDate}
             document={activeDoc}
             enabled={!busy}
+            focusFirstLineKey={focusFirstLineKey}
             focusItemId={focusItemId}
             onFocusHandled={onFocusHandled}
             onSave={handleSave}
@@ -661,60 +740,73 @@ export default function App() {
           />
         </main>
       </div>
-      {developerMode && (
-        <DebugOverlay
-          activeDate={activeDate}
-          activeDoc={liveDoc}
-          focusItemId={focusItemId}
-          folderName={gate.folderName}
-          offline={offline}
-          editorNonce={editorNonce}
-          sidebarDayCount={displaySidebar.length}
-          docsCacheSize={docsCache.size}
-        />
-      )}
+      <Suspense fallback={null}>
+        {developerMode && (
+          <DebugOverlay
+            activeDate={activeDate}
+            activeDoc={liveDoc}
+            focusItemId={focusItemId}
+            folderName={gate.folderName}
+            offline={offline}
+            editorNonce={editorNonce}
+            sidebarDayCount={displaySidebar.length}
+            docsCacheSize={docsCache.size}
+          />
+        )}
+        {paletteOpen && (
+          <CommandPalette
+            open
+            onClose={() => setPaletteOpen(false)}
+            folderName={gate.folderName}
+            offline={offline}
+            activeDoc={liveDoc}
+            onInsertTestHierarchy={insertDummyHierarchy}
+            onChangeFolder={openFolder}
+            onOpenShortcuts={openShortcuts}
+            onOpenSettings={openSettings}
+            onOpenTasks={openTasks}
+            onOpenSearch={openSearch}
+            onShowEmptyHints={showEmptyHints}
+            onExportMessage={onExportMessage}
+          />
+        )}
+        {shortcutsOpen && (
+          <ShortcutsDialog
+            open
+            onClose={() => setShortcutsOpen(false)}
+          />
+        )}
+        {settingsOpen && (
+          <SettingsDialog
+            open
+            onClose={() => setSettingsOpen(false)}
+          />
+        )}
+        {tasksOpen && (
+          <TasksDialog
+            open
+            onClose={() => setTasksOpen(false)}
+            docs={taskDocs}
+            onSelectItem={selectItem}
+            onChangeStatus={changeTaskStatus}
+            onChangeStatuses={changeTaskStatuses}
+          />
+        )}
+        {searchOpen && (
+          <SearchDialog
+            open
+            onClose={() => {
+              searchOpenRef.current = false;
+              setSearchOpen(false);
+            }}
+            index={searchIndexRef.current}
+            indexRevision={searchIndexRevision}
+            onSelectItem={selectItem}
+          />
+        )}
+      </Suspense>
       <UpdateBanner />
       <ToastHost />
-      <CommandPalette
-        open={paletteOpen}
-        onClose={() => setPaletteOpen(false)}
-        folderName={gate.folderName}
-        offline={offline}
-        activeDoc={liveDoc}
-        onInsertTestHierarchy={insertDummyHierarchy}
-        onChangeFolder={openFolder}
-        onOpenShortcuts={openShortcuts}
-        onOpenSettings={openSettings}
-        onOpenTasks={openTasks}
-        onOpenSearch={openSearch}
-        onExportMessage={onExportMessage}
-      />
-      <ShortcutsDialog
-        open={shortcutsOpen}
-        onClose={() => setShortcutsOpen(false)}
-      />
-      <SettingsDialog
-        open={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
-      />
-      <TasksDialog
-        open={tasksOpen}
-        onClose={() => setTasksOpen(false)}
-        docs={taskDocs}
-        onSelectItem={selectItem}
-        onChangeStatus={changeTaskStatus}
-        onChangeStatuses={changeTaskStatuses}
-      />
-      <SearchDialog
-        open={searchOpen}
-        onClose={() => {
-          searchOpenRef.current = false;
-          setSearchOpen(false);
-        }}
-        index={searchIndexRef.current}
-        indexRevision={searchIndexRevision}
-        onSelectItem={selectItem}
-      />
     </div>
   );
 }

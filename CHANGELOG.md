@@ -2,6 +2,17 @@
 
 Notes for each tagged release, drawn from merged pull-request summaries.
 
+## 1.3.0 — 2026-10-10
+
+- Empty-day get-started hints (local-first note, numbered tips, dismiss via × or 1 minute after typing starts); command palette **Show get started hints**
+- Focus the first outline line when hints appear
+- Shared SVG close icon across dialogs, settings remove buttons, and meta popover clears
+- Keyboard navigation for the meta popover **Add entity type** menu
+- Relicense to GPL-3.0-or-later
+- Production Workbox minify; lazy-load dialogs/debug/confetti; faster Vitest (`vmThreads`)
+- Search copy uses “item(s)” instead of “block(s)”; status select and close-button alignment fixes
+- Tests for empty hints, command palette scoring, and focus-first-line
+
 ## 1.2.0 — 2026-10-10
 
 - Theme system: keep light/dark/system; add High contrast, Neon, Miami Vice, Nord, Forest, Ocean, Sunset, Espresso, Terminal

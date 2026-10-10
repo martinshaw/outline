@@ -587,4 +587,4 @@ Enable **Settings → Pages → GitHub Actions** as the source. The `github-page
 
 ## License
 
-MIT — see the repository for license details.
+[GNU General Public License v3.0](./LICENSE) (or later).

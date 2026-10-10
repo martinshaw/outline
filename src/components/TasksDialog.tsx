@@ -31,6 +31,7 @@ import {
   type TaskSort,
   type TaskSortKey,
 } from '../utils/taskIndex';
+import { CloseIcon } from './CloseIcon';
 
 type Props = {
   open: boolean;
@@ -398,7 +399,7 @@ export function TasksDialog({
             aria-label="Close"
             onClick={onClose}
           >
-            ×
+            <CloseIcon size={14} />
           </button>
         </header>
 

@@ -1,4 +1,4 @@
-import confetti from 'canvas-confetti';
+import type confetti from 'canvas-confetti';
 import { getSettings } from '../settings/settingsStore';
 
 const FALLBACK_COLORS = [
@@ -16,10 +16,15 @@ const FALLBACK_COLORS = [
   '#40e0d0',
 ];
 
-let canvas: HTMLCanvasElement | null = null;
-let fire: confetti.CreateTypes | null = null;
+type ConfettiFn = typeof confetti;
+type CreateTypes = confetti.CreateTypes;
+type Options = confetti.Options;
 
-function ensureFire(): confetti.CreateTypes {
+let canvas: HTMLCanvasElement | null = null;
+let fire: CreateTypes | null = null;
+let confettiMod: ConfettiFn | null = null;
+
+function ensureFire(mod: ConfettiFn): CreateTypes {
   if (fire && canvas?.isConnected) return fire;
 
   canvas = document.createElement('canvas');
@@ -27,7 +32,7 @@ function ensureFire(): confetti.CreateTypes {
   canvas.style.cssText =
     'position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:2147483647';
   document.body.appendChild(canvas);
-  fire = confetti.create(canvas, { resize: true, useWorker: true });
+  fire = mod.create(canvas, { resize: true, useWorker: true });
   return fire;
 }
 
@@ -45,7 +50,7 @@ function themeColors(): string[] {
   return [...fromTheme, ...FALLBACK_COLORS];
 }
 
-function burst(shoot: confetti.CreateTypes, opts: confetti.Options): void {
+function burst(shoot: CreateTypes, opts: Options): void {
   void shoot(opts);
 }
 
@@ -53,14 +58,10 @@ function randomBetween(min: number, max: number): number {
   return min + Math.random() * (max - min);
 }
 
-/** Full-screen confetti when every subtask under a task becomes done/archived. */
-export function fireTaskCompleteConfetti(): void {
-  if (typeof document === 'undefined') return;
-  if (!getSettings().taskCompleteConfetti) return;
-
+function runShow(mod: ConfettiFn): void {
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)')
     .matches;
-  const shoot = ensureFire();
+  const shoot = ensureFire(mod);
   const colors = themeColors();
 
   if (reduceMotion) {
@@ -195,4 +196,20 @@ export function fireTaskCompleteConfetti(): void {
       });
     }
   }, 1600);
+}
+
+/** Full-screen confetti when every subtask under a task becomes done/archived. */
+export function fireTaskCompleteConfetti(): void {
+  if (typeof document === 'undefined') return;
+  if (!getSettings().taskCompleteConfetti) return;
+
+  if (confettiMod) {
+    runShow(confettiMod);
+    return;
+  }
+
+  void import('canvas-confetti').then((mod) => {
+    confettiMod = mod.default;
+    runShow(confettiMod);
+  });
 }

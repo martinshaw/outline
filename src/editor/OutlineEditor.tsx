@@ -26,11 +26,14 @@ import { AttachmentPlugin } from './plugins/AttachmentPlugin';
 import { AttachmentImagePlugin } from './plugins/AttachmentImagePlugin';
 import { FormatCommandPlugin } from './plugins/FormatCommandPlugin';
 import { PasteOutlinePlugin } from './plugins/PasteOutlinePlugin';
+import { FocusFirstLinePlugin } from './plugins/FocusFirstLinePlugin';
 
 type Props = {
   date: string;
   document: DayDocument;
   enabled: boolean;
+  /** When > 0, place the caret on the first outline row. */
+  focusFirstLineKey: number;
   focusItemId: string | null;
   onFocusHandled: () => void;
   onSave: (doc: DayDocument) => Promise<void>;
@@ -45,6 +48,7 @@ export const OutlineEditor = memo(function OutlineEditor({
   date,
   document,
   enabled,
+  focusFirstLineKey,
   focusItemId,
   onFocusHandled,
   onSave,
@@ -75,14 +79,13 @@ export const OutlineEditor = memo(function OutlineEditor({
           contentEditable={
             <ContentEditable className="editor-input" spellCheck={false} />
           }
-          placeholder={
-            <div className="editor-placeholder">Start writing…</div>
-          }
+          placeholder={null}
           ErrorBoundary={LexicalErrorBoundary}
         />
         <HistoryPlugin />
         <EditorFocusPlugin />
         <LoadDocumentPlugin document={document} />
+        <FocusFirstLinePlugin requestKey={focusFirstLineKey} />
         <ParagraphTransformPlugin />
         <OutlineStructurePlugin />
         <EmptyItemFocusPlugin />
