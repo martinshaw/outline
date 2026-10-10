@@ -24,6 +24,8 @@ import { MarkdownHeadingPlugin } from './plugins/MarkdownHeadingPlugin';
 import { EditorFocusPlugin } from './plugins/EditorFocusPlugin';
 import { AttachmentPlugin } from './plugins/AttachmentPlugin';
 import { AttachmentImagePlugin } from './plugins/AttachmentImagePlugin';
+import { FormatCommandPlugin } from './plugins/FormatCommandPlugin';
+import { PasteOutlinePlugin } from './plugins/PasteOutlinePlugin';
 
 type Props = {
   date: string;
@@ -92,6 +94,8 @@ export const OutlineEditor = memo(function OutlineEditor({
         <AttachmentPlugin />
         <AttachmentImagePlugin />
         <BlockSelectionPlugin />
+        <PasteOutlinePlugin />
+        <FormatCommandPlugin />
         <OutlineAutoLinkPlugin />
         <OutlineLinkPlugin />
         <PersistencePlugin

@@ -69,7 +69,8 @@ const SECTIONS: Section[] = [
       { keys: [alt, 'Drag'], action: 'Multi-select without gutter' },
       {
         keys: ['Select text'],
-        action: 'Select those blocks (click anywhere to clear)',
+        action:
+          'Within one item: text selection; across items: block selection',
       },
       {
         keys: ['Drag handle'],
@@ -85,6 +86,10 @@ const SECTIONS: Section[] = [
       { keys: [mod, 'B'], action: 'Bold' },
       { keys: [mod, 'I'], action: 'Italic' },
       { keys: [mod, 'U'], action: 'Underline' },
+      {
+        keys: [mod, 'P'],
+        action: 'Command palette → Formatting (bold, italic, clear, unlink…)',
+      },
       {
         keys: ['#', 'Space'],
         action: 'Heading 1–6 (`#` … `######` then space)',

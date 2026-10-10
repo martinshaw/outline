@@ -9,6 +9,8 @@ import {
   $isOutlineItemNode,
   OutlineItemNode,
 } from '../nodes/OutlineItemNode';
+import { $setStatusMaybeCelebrate } from '../utils/celebrateSubtasks';
+import { $outlineItemFromDOM } from '../utils/outlineHelpers';
 
 const MENU_CLASS = 'outline-status-menu';
 
@@ -80,23 +82,12 @@ export function StatusChipPlugin(): null {
         event.preventDefault();
         event.stopPropagation();
         const statusId = option.dataset.statusId;
-        const outlineId = option.dataset.outlineId;
-        if (!statusId || !outlineId) return;
+        const nodeKey = option.dataset.nodeKey;
+        if (!statusId || !nodeKey) return;
 
         editor.update(() => {
-          const walk = (node: OutlineItemNode): boolean => {
-            if (node.getId() === outlineId) {
-              node.setStatus(statusId);
-              return true;
-            }
-            for (const child of node.getChildren()) {
-              if ($isOutlineItemNode(child) && walk(child)) return true;
-            }
-            return false;
-          };
-          for (const child of $getRoot().getChildren()) {
-            if ($isOutlineItemNode(child) && walk(child)) break;
-          }
+          const node = $getNodeByKey(nodeKey);
+          if ($isOutlineItemNode(node)) $setStatusMaybeCelebrate(node, statusId);
         });
         closeAllMenus();
         return;
@@ -110,8 +101,13 @@ export function StatusChipPlugin(): null {
       event.stopPropagation();
 
       const itemEl = chip.closest<HTMLElement>('.outline-item');
-      const outlineId = itemEl?.getAttribute('data-outline-id');
-      if (!outlineId) return;
+      if (!itemEl) return;
+
+      let nodeKey: string | null = null;
+      editor.read(() => {
+        nodeKey = $outlineItemFromDOM(itemEl)?.getKey() ?? null;
+      });
+      if (!nodeKey) return;
 
       const wasOpen = chip.getAttribute('aria-expanded') === 'true';
       closeAllMenus();
@@ -133,7 +129,7 @@ export function StatusChipPlugin(): null {
         opt.className = `${MENU_CLASS}__option`;
         opt.setAttribute('role', 'option');
         opt.dataset.statusId = status.id;
-        opt.dataset.outlineId = outlineId;
+        opt.dataset.nodeKey = nodeKey;
         opt.textContent = status.label;
         opt.style.setProperty('--status-color', status.color);
         if (status.id === currentStatus) {

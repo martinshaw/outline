@@ -18,15 +18,14 @@ import {
   FONT_SIZE_MIN,
   FONT_SIZE_STEP,
   SAVE_DEBOUNCE_OPTIONS,
-  THEME_OPTIONS,
   type AppSettings,
   type BackupMode,
   type EntityTypeDef,
   type StatusDef,
-  type ThemeId,
 } from '../settings/types';
 import { DEFAULT_ENTITY_TYPES } from '../entities/types';
 import { FontPicker, type FontPickerValue } from './FontPicker';
+import { ThemePicker } from './ThemePicker';
 
 type Props = {
   open: boolean;
@@ -271,30 +270,31 @@ export function SettingsDialog({ open, onClose }: Props) {
             <h3 className="settings-dialog__panel-title">{sectionLabel}</h3>
 
             {section === 'editor' && (
-              <section className="settings-section" aria-label="Editor">
-                <div className="settings-field">
-                  <span className="settings-field__label">Font</span>
-                  <FontPicker
-                    value={fontPickerValue(settings)}
-                    localFamilies={localFamilies}
-                    localFontsOk={localFontsOk}
-                    localBusy={localBusy}
-                    onChange={onFontPicked}
-                    onAddSystemFonts={() => void loadSystemFonts()}
-                  />
-                  <p className="settings-field__hint">
-                    {localFontsOk
-                      ? 'Type to search. Choose Add system fonts… to grant access and list installed fonts.'
-                      : 'Built-in fonts only — Local Font Access needs desktop Chrome or Edge.'}
+              <section
+                className="settings-section settings-section--editor"
+                aria-label="Editor"
+              >
+                <FontPicker
+                  value={fontPickerValue(settings)}
+                  localFamilies={localFamilies}
+                  localFontsOk={localFontsOk}
+                  localBusy={localBusy}
+                  onChange={onFontPicked}
+                  onAddSystemFonts={() => void loadSystemFonts()}
+                />
+                {localStatus && (
+                  <p className="settings-field__hint" role="status">
+                    {localStatus}
                   </p>
-                  {localStatus && (
-                    <p className="settings-field__hint" role="status">
-                      {localStatus}
-                    </p>
-                  )}
-                </div>
+                )}
+                {!localFontsOk && (
+                  <p className="settings-field__hint">
+                    Built-in fonts only — Local Font Access needs desktop Chrome
+                    or Edge.
+                  </p>
+                )}
 
-                <label className="settings-field">
+                <label className="settings-field settings-field--footer">
                   <span className="settings-field__label">
                     Size
                     <span className="settings-field__value">
@@ -320,49 +320,45 @@ export function SettingsDialog({ open, onClose }: Props) {
                     <span>Larger</span>
                   </span>
                 </label>
-
-                <p
-                  className="settings-preview"
-                  style={{
-                    fontFamily: 'var(--editor-font-family)',
-                    fontSize: 'var(--editor-font-size)',
-                  }}
-                >
-                  The quick brown fox jumps over the lazy dog.
-                </p>
               </section>
             )}
 
             {section === 'appearance' && (
-              <section className="settings-section" aria-label="Appearance">
-                <label className="settings-field">
-                  <span className="settings-field__label">Theme</span>
-                  <select
-                    className="settings-field__control"
-                    value={settings.theme}
-                    onChange={(e) =>
-                      setSettings({ theme: e.target.value as ThemeId })
-                    }
-                  >
-                    {THEME_OPTIONS.map((opt) => (
-                      <option key={opt.id} value={opt.id}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+              <section
+                className="settings-section settings-section--appearance"
+                aria-label="Appearance"
+              >
+                <ThemePicker
+                  value={settings.theme}
+                  onChange={(theme) => setSettings({ theme })}
+                />
 
-                <label className="settings-field settings-field--row">
-                  <span className="settings-field__label">Collapse sidebar</span>
-                  <input
-                    type="checkbox"
-                    className="settings-field__checkbox"
-                    checked={settings.sidebarCollapsed}
-                    onChange={(e) =>
-                      setSettings({ sidebarCollapsed: e.target.checked })
-                    }
-                  />
-                </label>
+                <div className="settings-field settings-field--footer settings-appearance-toggles">
+                  <label className="settings-field settings-field--row">
+                    <span className="settings-field__label">Collapse sidebar</span>
+                    <input
+                      type="checkbox"
+                      className="settings-field__checkbox"
+                      checked={settings.sidebarCollapsed}
+                      onChange={(e) =>
+                        setSettings({ sidebarCollapsed: e.target.checked })
+                      }
+                    />
+                  </label>
+                  <label className="settings-field settings-field--row">
+                    <span className="settings-field__label">
+                      Confetti when all subtasks are done
+                    </span>
+                    <input
+                      type="checkbox"
+                      className="settings-field__checkbox"
+                      checked={settings.taskCompleteConfetti}
+                      onChange={(e) =>
+                        setSettings({ taskCompleteConfetti: e.target.checked })
+                      }
+                    />
+                  </label>
+                </div>
               </section>
             )}
 
@@ -574,8 +570,7 @@ export function SettingsDialog({ open, onClose }: Props) {
                 <div className="settings-section__body">
                   <p className="settings-field__hint">
                     Tools for diagnosing saves, selection, and editor
-                    performance. Nothing is collected or shown until you turn
-                    the panel on — similar to Safari’s Develop menu.
+                    performance.
                   </p>
                   <p className="settings-field__hint">
                     When enabled, a panel appears at the bottom-right with live

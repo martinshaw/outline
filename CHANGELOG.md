@@ -2,6 +2,18 @@
 
 Notes for each tagged release, drawn from merged pull-request summaries.
 
+## 1.2.0 — 2026-10-10
+
+- Theme system: keep light/dark/system; add High contrast, Neon, Miami Vice, Nord, Forest, Ocean, Sunset, Espresso, Terminal
+- Theme picker exploration grid (search + live palette previews), matching the font picker
+- Font picker: full-panel exploration grid instead of a small dropdown
+- Confetti when every subtask under a task is done/archived; toggle in Appearance settings
+- Tasks dialog: denser filters, larger dialog, Finder-style multi-select and bulk status updates
+- Match Search, Settings, Command palette, and Shortcuts dialogs to the larger Tasks size
+- Fix status chip dropdown (Lexical `editor.read` for DOM→node lookup); restore chip vertical alignment
+- Export zip includes only attachments referenced by exported items
+- Paste/outline id remap, format commands, select-all and empty-paragraph fixes; folder switch remounts editor
+
 ## 1.1.1 — 2026-10-10
 
 - Add `CHANGELOG.md` seeded from merged release PR summaries

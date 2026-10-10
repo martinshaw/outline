@@ -1,10 +1,19 @@
 import { useEffect } from 'react';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
 import {
-  $selectAll,
+  $getRoot,
+  $isTextNode,
+  $createRangeSelection,
+  $setSelection,
   COMMAND_PRIORITY_HIGH,
   SELECT_ALL_COMMAND,
 } from 'lexical';
+import {
+  setBlockSelectedIds,
+  setBlockSelfOnlyIds,
+} from '../blockSelectionStore';
+import { $collectOutlineItemsDFS } from '../utils/outlineHelpers';
+import { $isOutlineItemNode } from '../nodes/OutlineItemNode';
 
 function isUiChromeTarget(target: EventTarget | null): boolean {
   if (!(target instanceof Element)) return false;
@@ -39,6 +48,42 @@ function isUiChromeTarget(target: EventTarget | null): boolean {
 }
 
 /**
+ * Select every top-level outline row (block chrome) and the full text range
+ * so replace-on-type / copy still work. Avoids Lexical `$selectAll`'s root
+ * element selection, which can insert empty paragraph artifacts.
+ */
+function $selectAllOutline(): boolean {
+  const items = $collectOutlineItemsDFS($getRoot());
+  if (items.length === 0) return false;
+
+  const topLevel = items.filter((item) => {
+    const parent = item.getParent();
+    return !$isOutlineItemNode(parent);
+  });
+  setBlockSelectedIds(topLevel.map((item) => item.getId()));
+  setBlockSelfOnlyIds([]);
+
+  const firstItem = items[0];
+  const lastItem = items[items.length - 1];
+  const start = firstItem.getFirstDescendant() ?? firstItem;
+  const end = lastItem.getLastDescendant() ?? lastItem;
+
+  const sel = $createRangeSelection();
+  if ($isTextNode(start)) {
+    sel.anchor.set(start.getKey(), 0, 'text');
+  } else {
+    sel.anchor.set(firstItem.getKey(), 0, 'element');
+  }
+  if ($isTextNode(end)) {
+    sel.focus.set(end.getKey(), end.getTextContentSize(), 'text');
+  } else {
+    sel.focus.set(lastItem.getKey(), lastItem.getChildrenSize(), 'element');
+  }
+  $setSelection(sel);
+  return true;
+}
+
+/**
  * Keep the Lexical document focused for editing shortcuts (e.g. ⌘A), except
  * when the user is interacting with menus, sidebar, dialogs, or form fields.
  */
@@ -51,7 +96,7 @@ export function EditorFocusPlugin(): null {
       (event) => {
         event?.preventDefault();
         editor.update(() => {
-          $selectAll();
+          $selectAllOutline();
         });
         return true;
       },
@@ -87,7 +132,9 @@ export function EditorFocusPlugin(): null {
         }
       }
 
+      // Stop Lexical's root listener from dispatching SELECT_ALL a second time.
       event.preventDefault();
+      event.stopImmediatePropagation();
       editor.focus();
       editor.dispatchCommand(SELECT_ALL_COMMAND, event);
     };

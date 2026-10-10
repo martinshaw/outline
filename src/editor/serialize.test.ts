@@ -158,6 +158,23 @@ describe('serialize round-trip', () => {
   });
 });
 
+describe('duplicate id repair on load', () => {
+  it('assigns fresh ids when the document contains duplicates', () => {
+    const doc = dayDoc([
+      item('dup', 'First', [item('dup', 'Nested also dup')]),
+      item('dup', 'Second root dup'),
+    ]);
+    const editor = setupEditor(doc);
+    const out = editorToDayDocument(editor, doc.date);
+    const ids = [
+      out.items[0].id,
+      out.items[0].children[0].id,
+      out.items[1].id,
+    ];
+    expect(new Set(ids).size).toBe(3);
+  });
+});
+
 describe('normalizeDayDocument', () => {
   it('migrates v1 project/task kinds to task/subtask', () => {
     const normalized = normalizeDayDocument({

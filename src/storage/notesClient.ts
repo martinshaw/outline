@@ -27,6 +27,7 @@ import {
   loadEntityCatalog,
   loadDay as fsLoadDay,
   readAttachment as fsReadAttachment,
+  readWorkspaceFile as fsReadWorkspaceFile,
   saveAppSettings,
   saveEntityCatalog,
   saveDay as fsSaveDay,
@@ -114,6 +115,16 @@ class NotesClient {
   async listDirectory(path: string[] = []): Promise<FsEntry[]> {
     if (!isDebugEnabled()) return [];
     return listDirectoryEntries(this.requireRoot(), path);
+  }
+
+  /** Debug panel only — read a workspace file by relative path segments. */
+  async readWorkspaceFile(path: string[]): Promise<File | null> {
+    if (!isDebugEnabled()) return null;
+    try {
+      return await fsReadWorkspaceFile(this.requireRoot(), path);
+    } catch {
+      return null;
+    }
   }
 
   async writeAttachment(file: File): Promise<AttachmentMeta> {

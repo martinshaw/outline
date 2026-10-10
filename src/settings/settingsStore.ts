@@ -10,6 +10,7 @@ import {
   FONT_SIZE_MAX,
   FONT_SIZE_MIN,
   FONT_SIZE_STEP,
+  THEME_OPTIONS,
   type AppSettings,
   type BackupMode,
   type EntityTypeDef,
@@ -42,7 +43,7 @@ function isFontId(v: unknown): v is FontId {
 }
 
 function isThemeId(v: unknown): v is ThemeId {
-  return v === 'system' || v === 'light' || v === 'dark';
+  return THEME_OPTIONS.some((o) => o.id === v);
 }
 
 function isBackupMode(v: unknown): v is BackupMode {
@@ -203,6 +204,9 @@ export function normalizeSettings(
   }
   if (typeof partial.developerMode === 'boolean') {
     base.developerMode = partial.developerMode;
+  }
+  if (typeof partial.taskCompleteConfetti === 'boolean') {
+    base.taskCompleteConfetti = partial.taskCompleteConfetti;
   }
   return base;
 }

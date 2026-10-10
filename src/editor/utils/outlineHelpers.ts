@@ -1,4 +1,5 @@
 import {
+  $getNearestNodeFromDOMNode,
   $getRoot,
   $getSelection,
   $isRangeSelection,
@@ -13,6 +14,7 @@ import {
   $isOutlineItemNode,
   OutlineItemNode,
 } from '../nodes/OutlineItemNode';
+import { createId } from '../../utils/id';
 
 /** Nearest OutlineItemNode ancestor of a node (or itself). */
 export function $getOutlineItem(node: LexicalNode | null): OutlineItemNode | null {
@@ -122,6 +124,34 @@ export function $findOutlineItemById(
     return null;
   };
   return walk(root.getChildren());
+}
+
+/**
+ * Resolve the outline item for a DOM click via Lexical's node map (not
+ * data-outline-id). Safe when duplicate ids exist from older pastes.
+ */
+export function $outlineItemFromDOM(
+  dom: Node | null,
+): OutlineItemNode | null {
+  if (!dom) return null;
+  return $getOutlineItem($getNearestNodeFromDOMNode(dom));
+}
+
+/** Assign fresh ids to any outline items that share an id with an earlier row. */
+export function $repairDuplicateOutlineIds(): boolean {
+  const seen = new Set<string>();
+  let changed = false;
+  for (const item of $collectOutlineItemsDFS($getRoot())) {
+    const id = item.getId();
+    if (!id || seen.has(id)) {
+      item.setId(createId());
+      changed = true;
+      seen.add(item.getId());
+    } else {
+      seen.add(id);
+    }
+  }
+  return changed;
 }
 
 /** All outline items in visual (DFS) order. */
