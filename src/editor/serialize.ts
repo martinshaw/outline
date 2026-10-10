@@ -12,6 +12,7 @@ import {
   $isLinkNode,
 } from '@lexical/link';
 import { getDefaultStatusId } from '../settings/settingsStore';
+import { normalizeAttachmentMeta } from '../storage/attachments';
 import {
   DAY_DOCUMENT_VERSION,
   isRoleKind,
@@ -102,6 +103,7 @@ function outlineItemToData(node: OutlineItemNode): OutlineItem {
     status: isRole ? node.getStatus() : null,
     deadline: isRole ? node.getDeadline() : null,
     entities: isRole ? node.getEntities() : [],
+    attachment: kind === 'attachment' ? node.getAttachment() : null,
     content: contentNodesToSegments(contentChildren),
     children: nested.map(outlineItemToData),
   };
@@ -157,6 +159,8 @@ function dataToOutlineItem(item: OutlineItem): OutlineItemNode {
   const entities = isRoleKind(kind)
     ? normalizeEntities(item.entities ?? item.people)
     : [];
+  const attachment =
+    kind === 'attachment' ? normalizeAttachmentMeta(item.attachment) : null;
   const node = $createOutlineItemNode(
     item.id || createId(),
     kind,
@@ -164,6 +168,7 @@ function dataToOutlineItem(item: OutlineItem): OutlineItemNode {
     headingLevel,
     deadline,
     entities,
+    attachment,
   );
   node.append(...segmentsToNodes(item.content));
   for (const child of item.children) {

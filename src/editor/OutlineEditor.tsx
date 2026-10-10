@@ -22,6 +22,8 @@ import { ParagraphTransformPlugin } from './plugins/ParagraphTransformPlugin';
 import { EmptyItemFocusPlugin } from './plugins/EmptyItemFocusPlugin';
 import { MarkdownHeadingPlugin } from './plugins/MarkdownHeadingPlugin';
 import { EditorFocusPlugin } from './plugins/EditorFocusPlugin';
+import { AttachmentPlugin } from './plugins/AttachmentPlugin';
+import { AttachmentImagePlugin } from './plugins/AttachmentImagePlugin';
 
 type Props = {
   date: string;
@@ -87,6 +89,8 @@ export const OutlineEditor = memo(function OutlineEditor({
         <RolePlugin />
         <StatusChipPlugin />
         <MetaAttributesPlugin />
+        <AttachmentPlugin />
+        <AttachmentImagePlugin />
         <BlockSelectionPlugin />
         <OutlineAutoLinkPlugin />
         <OutlineLinkPlugin />

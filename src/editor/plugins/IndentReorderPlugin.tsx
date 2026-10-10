@@ -9,7 +9,6 @@ import {
   COMMAND_PRIORITY_HIGH,
   KEY_TAB_COMMAND,
   createCommand,
-  type ElementNode,
   type LexicalCommand,
   type NodeKey,
 } from 'lexical';
@@ -23,10 +22,10 @@ import type { OutlineItemNode } from '../nodes/OutlineItemNode';
 import {
   $getContentChildren,
   $getMoveTargets,
-  $getNestedItems,
-  $getNextOutlineSibling,
-  $getParentOutlineItem,
-  $getPreviousOutlineSibling,
+  $indentOutlineItems,
+  $moveOutlineItemsDown,
+  $moveOutlineItemsUp,
+  $outdentOutlineItems,
 } from '../utils/outlineHelpers';
 
 export const INDENT_COMMAND: LexicalCommand<'indent' | 'outdent'> = createCommand(
@@ -41,12 +40,6 @@ function isMac(): boolean {
     typeof navigator !== 'undefined' &&
     /Mac|iPhone|iPad|iPod/i.test(navigator.platform)
   );
-}
-
-function $sameParent(targets: OutlineItemNode[]): boolean {
-  if (targets.length === 0) return false;
-  const parent = targets[0].getParent();
-  return targets.every((t) => t.getParent() === parent);
 }
 
 type CaretSnapshot = {
@@ -108,136 +101,34 @@ function $restoreBlockSelection(
   $restoreCaret(snapshot, targets[0]);
 }
 
-/** Insert `nodes` (in order) immediately before `ref`. */
-function $insertAllBefore(ref: OutlineItemNode, nodes: OutlineItemNode[]): void {
-  for (let i = nodes.length - 1; i >= 0; i--) {
-    ref.insertBefore(nodes[i]);
-  }
-}
-
-/** Insert `nodes` (in order) immediately after `ref`. */
-function $insertAllAfter(ref: OutlineItemNode, nodes: OutlineItemNode[]): void {
-  let cursor: OutlineItemNode = ref;
-  for (const node of nodes) {
-    cursor.insertAfter(node);
-    cursor = node;
-  }
-}
-
-function $detachAll(nodes: OutlineItemNode[]): void {
-  for (const n of nodes) n.remove();
-}
-
 function $indent(): boolean {
   const targets = $getMoveTargets();
-  if (targets.length === 0 || !$sameParent(targets)) return false;
-
-  const prev = $getPreviousOutlineSibling(targets[0]);
-  if (!prev || targets.includes(prev)) return false;
-
   const caret = $captureCaret();
-  $detachAll(targets);
-  for (const t of targets) {
-    prev.append(t);
-  }
+  if (!$indentOutlineItems(targets)) return false;
   $restoreCaret(caret, targets[0]);
   return true;
 }
 
 function $outdent(): boolean {
   const targets = $getMoveTargets();
-  if (targets.length === 0 || !$sameParent(targets)) return false;
-
-  const parent = $getParentOutlineItem(targets[0]);
-  if (!parent) return false;
-
-  const last = targets[targets.length - 1];
-  const adopted: OutlineItemNode[] = [];
-  let sibling = $getNextOutlineSibling(last);
-  while (sibling) {
-    if (targets.includes(sibling)) break;
-    const next = $getNextOutlineSibling(sibling);
-    adopted.push(sibling);
-    sibling = next;
-  }
-
-  const parentParent = parent.getParent();
-  const parentIndex = parent.getIndexWithinParent();
-
   const caret = $captureCaret();
-  $detachAll(adopted);
-  $detachAll(targets);
-
-  if (parentParent) {
-    (parentParent as ElementNode).splice(parentIndex + 1, 0, targets);
-  } else {
-    $insertAllAfter(parent, targets);
-  }
-
-  for (const s of adopted) {
-    last.append(s);
-  }
+  if (!$outdentOutlineItems(targets)) return false;
   $restoreCaret(caret, targets[0]);
   return true;
 }
 
 function $moveUp(): boolean {
   const targets = $getMoveTargets();
-  if (targets.length === 0 || !$sameParent(targets)) return false;
-
-  const first = targets[0];
-  const prev = $getPreviousOutlineSibling(first);
   const caret = $captureCaret();
-
-  if (prev && !targets.includes(prev)) {
-    $detachAll(targets);
-    $insertAllBefore(prev, targets);
-    $restoreBlockSelection(targets, caret);
-    return true;
-  }
-
-  const parent = $getParentOutlineItem(first);
-  if (!parent) return false;
-
-  $detachAll(targets);
-  $insertAllBefore(parent, targets);
+  if (!$moveOutlineItemsUp(targets)) return false;
   $restoreBlockSelection(targets, caret);
   return true;
 }
 
 function $moveDown(): boolean {
   const targets = $getMoveTargets();
-  if (targets.length === 0 || !$sameParent(targets)) return false;
-
-  const last = targets[targets.length - 1];
-  const next = $getNextOutlineSibling(last);
   const caret = $captureCaret();
-
-  if (next && !targets.includes(next)) {
-    $detachAll(targets);
-    $insertAllAfter(next, targets);
-    $restoreBlockSelection(targets, caret);
-    return true;
-  }
-
-  const parent = $getParentOutlineItem(targets[0]);
-  if (!parent) return false;
-
-  const aunt = $getNextOutlineSibling(parent);
-  if (aunt) {
-    $detachAll(targets);
-    const nested = $getNestedItems(aunt);
-    if (nested.length > 0) {
-      $insertAllBefore(nested[0], targets);
-    } else {
-      for (const t of targets) aunt.append(t);
-    }
-    $restoreBlockSelection(targets, caret);
-    return true;
-  }
-
-  $detachAll(targets);
-  $insertAllAfter(parent, targets);
+  if (!$moveOutlineItemsDown(targets)) return false;
   $restoreBlockSelection(targets, caret);
   return true;
 }

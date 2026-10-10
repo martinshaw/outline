@@ -84,9 +84,17 @@ function openMetaPopover(
   pop.setAttribute('role', 'dialog');
   pop.setAttribute('aria-label', 'Deadline and entities');
 
+  type ActiveTypeField = {
+    typeId: string;
+    field: HTMLElement;
+    ms: EntityMultiselectHandle;
+  };
+
   const multiselects: EntityMultiselectHandle[] = [];
+  const activeTypeFields = new Map<string, ActiveTypeField>();
   let closed = false;
   let deadlineInput: HTMLInputElement;
+  let typePickerOpen = false;
 
   const collectEntities = (commitPending: boolean): string[] => {
     if (commitPending) {
@@ -114,6 +122,7 @@ function openMetaPopover(
   const teardown = () => {
     for (const ms of multiselects) ms.destroy();
     multiselects.length = 0;
+    activeTypeFields.clear();
   };
 
   const dismiss = () => {
@@ -181,26 +190,104 @@ function openMetaPopover(
     pop.appendChild(field);
   }
 
-  for (const typeDef of typeDefs) {
+  const entityFieldsHost = document.createElement('div');
+  entityFieldsHost.className = `${POPOVER_CLASS}__entity-fields`;
+  pop.appendChild(entityFieldsHost);
+
+  const addTypeWrap = document.createElement('div');
+  addTypeWrap.className = `${POPOVER_CLASS}__add-type`;
+
+  const addTypeBtn = document.createElement('button');
+  addTypeBtn.type = 'button';
+  addTypeBtn.className = `${POPOVER_CLASS}__add-type-btn`;
+  addTypeBtn.textContent = '+ Add entity type';
+
+  const typeMenu = document.createElement('ul');
+  typeMenu.className = `${POPOVER_CLASS}__add-type-menu`;
+  typeMenu.setAttribute('role', 'listbox');
+  typeMenu.setAttribute('aria-label', 'Entity types');
+  typeMenu.hidden = true;
+
+  const syncAddTypeVisibility = () => {
+    const remaining = typeDefs.filter((t) => !activeTypeFields.has(t.id));
+    addTypeWrap.hidden = remaining.length === 0;
+    if (remaining.length === 0) {
+      typeMenu.hidden = true;
+      typePickerOpen = false;
+      addTypeBtn.setAttribute('aria-expanded', 'false');
+    }
+  };
+
+  const closeTypeMenu = () => {
+    typeMenu.hidden = true;
+    typePickerOpen = false;
+    addTypeBtn.setAttribute('aria-expanded', 'false');
+  };
+
+  const renderTypeMenu = () => {
+    typeMenu.replaceChildren();
+    const remaining = typeDefs.filter((t) => !activeTypeFields.has(t.id));
+    for (const typeDef of remaining) {
+      const opt = document.createElement('li');
+      opt.className = `${POPOVER_CLASS}__add-type-option`;
+      opt.setAttribute('role', 'option');
+      opt.textContent = typeDef.label;
+      opt.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      });
+      opt.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        closeTypeMenu();
+        addEntityTypeField(typeDef.id, typeDef.label, [], true);
+      });
+      typeMenu.appendChild(opt);
+    }
+    typeMenu.hidden = remaining.length === 0;
+    typePickerOpen = remaining.length > 0;
+    addTypeBtn.setAttribute('aria-expanded', typePickerOpen ? 'true' : 'false');
+  };
+
+  const removeEntityTypeField = (typeId: string) => {
+    const active = activeTypeFields.get(typeId);
+    if (!active) return;
+    active.ms.clear();
+    const idx = multiselects.indexOf(active.ms);
+    if (idx >= 0) multiselects.splice(idx, 1);
+    active.ms.destroy();
+    active.field.remove();
+    activeTypeFields.delete(typeId);
+    persist();
+    syncAddTypeVisibility();
+  };
+
+  const addEntityTypeField = (
+    typeId: string,
+    typeLabel: string,
+    selectedForType: string[],
+    focusInput: boolean,
+  ) => {
+    if (activeTypeFields.has(typeId)) {
+      if (focusInput) activeTypeFields.get(typeId)?.ms.focus();
+      return;
+    }
+
     const field = document.createElement('div');
     field.className = `${POPOVER_CLASS}__field`;
+    field.dataset.entityType = typeId;
 
     const label = document.createElement('span');
     label.className = `${POPOVER_CLASS}__label`;
-    label.textContent = typeDef.label;
+    label.textContent = typeLabel;
     field.appendChild(label);
 
     const row = document.createElement('div');
     row.className = `${POPOVER_CLASS}__field-row`;
 
-    const selectedForType = entityIds.filter((id) => {
-      const entity = getEntityById(id);
-      return entity?.type === typeDef.id;
-    });
-
     const ms = createEntityMultiselect({
-      typeId: typeDef.id,
-      typeLabel: typeDef.label,
+      typeId,
+      typeLabel,
       selectedIds: selectedForType,
       classPrefix: POPOVER_CLASS,
       onEscape: dismiss,
@@ -210,15 +297,49 @@ function openMetaPopover(
 
     row.append(
       ms.root,
-      makeFieldClear(`Clear ${typeDef.label}`, () => {
-        ms.clear();
-        persist();
-        ms.focus();
+      makeFieldClear(`Remove ${typeLabel}`, () => {
+        removeEntityTypeField(typeId);
       }),
     );
     field.appendChild(row);
-    pop.appendChild(field);
+    entityFieldsHost.appendChild(field);
+    activeTypeFields.set(typeId, { typeId, field, ms });
+    syncAddTypeVisibility();
+    if (focusInput) queueMicrotask(() => ms.focus());
+  };
+
+  addTypeBtn.setAttribute('aria-haspopup', 'listbox');
+  addTypeBtn.setAttribute('aria-expanded', 'false');
+  addTypeBtn.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  });
+  addTypeBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (typePickerOpen) closeTypeMenu();
+    else renderTypeMenu();
+  });
+
+  addTypeWrap.append(addTypeBtn, typeMenu);
+  pop.appendChild(addTypeWrap);
+
+  pop.addEventListener('mousedown', (e) => {
+    if (!(e.target instanceof Node)) return;
+    if (addTypeWrap.contains(e.target)) return;
+    if (typePickerOpen) closeTypeMenu();
+  });
+
+  // Show types that already have linked entities on this item.
+  for (const typeDef of typeDefs) {
+    const selectedForType = entityIds.filter((id) => {
+      const entity = getEntityById(id);
+      return entity?.type === typeDef.id;
+    });
+    if (selectedForType.length === 0) continue;
+    addEntityTypeField(typeDef.id, typeDef.label, selectedForType, false);
   }
+  syncAddTypeVisibility();
 
   activeDismiss = dismiss;
   document.body.appendChild(pop);

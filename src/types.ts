@@ -1,7 +1,17 @@
-export type ItemKind = 'note' | 'task' | 'subtask' | 'heading';
+export type ItemKind = 'note' | 'task' | 'subtask' | 'heading' | 'attachment';
 
 /** Markdown-style heading depth (`#` … `######`). */
 export type HeadingLevel = 1 | 2 | 3 | 4 | 5 | 6;
+
+/** File stored under workspace `attachments/` and referenced by an item. */
+export type ItemAttachment = {
+  path: string;
+  mime: string;
+  name: string;
+  size: number;
+  /** Image display size in the outline (`small` | `medium` | `large` | `full`). */
+  displaySize?: 'small' | 'medium' | 'large' | 'full';
+};
 
 export type InlineMark = {
   bold?: boolean;
@@ -31,6 +41,8 @@ export type OutlineItem = {
    * @deprecated Legacy person ids/labels — migrated to `entities` on load.
    */
   people?: string[];
+  /** Present when kind is `attachment` — relative path under `attachments/`. */
+  attachment?: ItemAttachment | null;
   content: InlineSegment[];
   children: OutlineItem[];
 };
@@ -85,16 +97,24 @@ export function normalizeItemKind(
     if (raw === 'task') return 'subtask';
   }
   if (raw === 'project') return 'task'; // stray legacy
-  if (raw === 'note' || raw === 'task' || raw === 'subtask' || raw === 'heading') {
+  if (
+    raw === 'note' ||
+    raw === 'task' ||
+    raw === 'subtask' ||
+    raw === 'heading' ||
+    raw === 'attachment'
+  ) {
     return raw;
   }
   return 'note';
 }
 
 function migrateOutlineItem(raw: OutlineItem, docVersion: number): OutlineItem {
+  const kind = normalizeItemKind(raw.kind, docVersion);
   return {
     ...raw,
-    kind: normalizeItemKind(raw.kind, docVersion),
+    kind,
+    attachment: kind === 'attachment' ? raw.attachment ?? null : null,
     children: Array.isArray(raw.children)
       ? raw.children.map((c) => migrateOutlineItem(c, docVersion))
       : [],

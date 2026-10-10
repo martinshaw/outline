@@ -1,6 +1,6 @@
 # Outline
 
-**Version 1.0.0** · [Live demo](https://martinshaw.github.io/outline/) · [Repository](https://github.com/martinshaw/outline)
+**Version 1.1.0** · [Live demo](https://martinshaw.github.io/outline/) · [Repository](https://github.com/martinshaw/outline)
 
 Local-first chronological outline editor inspired by [LogSeq](https://logseq.com). Notes live in a folder on your computer via Chrome’s File System Access API — no account, no server, no sync backend.
 
@@ -55,6 +55,7 @@ Built with [React](https://react.dev), [Lexical](https://lexical.dev), [Vite](ht
 | **Sidebar** | Navigate days → tasks → subtasks; collapse state persisted |
 | **Rich text** | Bold, italic, underline |
 | **Links** | Paste/type URLs; click to open; unlink / whole-link delete |
+| **Attachments** | Drag-drop or paste images, audio, video, or files into `attachments/`; image size, caption, fullscreen |
 | **Block selection** | Gutter select, multi-select, drag to relocate at any level |
 | **Exports** | Day or selection as JSON, YAML, Markdown, text, or HTML |
 | **Backups** | Snapshot notes edited yesterday when you first write today |
@@ -178,16 +179,17 @@ With a **block selection**, Tab, Shift+Tab, and move shortcuts apply to the whol
 
 | Action | Result |
 |--------|--------|
-| Click left gutter | Select block |
+| Click left gutter | Select block (nested children look selected and move with it) |
+| Second gutter click on parent | Select parent only — moves leave children in place |
 | Drag gutter | Multi-select contiguous range |
 | `Shift`+click gutter | Extend selection |
 | `Alt`+drag on items | Multi-select without the gutter |
-| Drag selection (gutter) | Move blocks between items; adopts that nesting level |
+| Drag selection (handle) | Move blocks between items; adopts that nesting level |
 | Drag across text | Starts a text selection, then switches to block selection as you drag |
 | Triple-click | Select block |
 | `Esc` | Clear selection |
 
-Selected blocks include nested children for move/indent where applicable. Selection is used for **Export selection**. UI chrome (sidebar, menus, chips) is non-selectable so `⌘A` / `Ctrl+A` targets the outline.
+By default, selecting a parent includes its nested children for move/indent. A **second gutter click** on that parent toggles **self-only** mode (subtle outline; children no longer highlighted) so you can relocate the parent alone; click again to restore subtree moves. Selection is used for **Export selection**. UI chrome (sidebar, menus, chips) is non-selectable so `⌘A` / `Ctrl+A` targets the outline.
 
 ### Command palette
 
@@ -328,6 +330,8 @@ Everything stays inside the folder you grant:
 your-folder/
   settings.json           # app preferences (font, theme, statuses, backups, …)
   entities.json           # workspace entities (people, companies, …)
+  attachments/            # dropped/pasted files (images, audio, video, …)
+    <uuid>.png
   notes/
     2026-10-08.json       # one file per day with content
     manifest.json         # index of day keys (rebuilt on save)
@@ -393,14 +397,17 @@ Each `notes/YYYY-MM-DD.json` file looks like:
 | `version` | Schema version (`2`; `1` with `project`/`task` kinds is migrated on load) |
 | `date` | `YYYY-MM-DD` (local calendar) |
 | `items` | Top-level outline nodes |
-| `kind` | `"note"` \| `"task"` \| `"subtask"` \| `"heading"` |
+| `kind` | `"note"` \| `"task"` \| `"subtask"` \| `"heading"` \| `"attachment"` |
 | `headingLevel` | `1`–`6` when `kind` is `"heading"`; otherwise omitted/`null` |
 | `status` | Status id for task/subtask (from `settings.json` statuses); omitted/`null` for notes/headings |
 | `deadline` | ISO date `YYYY-MM-DD` for task/subtask; omitted/`null` otherwise |
 | `entities` | Workspace **entity ids** from `entities.json`; `[]` / omitted otherwise |
 | `people` | Legacy; migrated into `entities` on load |
-| `content` | Inline segments: plain/formatted text or links |
+| `attachment` | `{ path, mime, name, size, displaySize? }` when `kind` is `"attachment"` (`path` like `attachments/<uuid>.ext`) |
+| `content` | Inline segments: plain/formatted text or links (caption on attachments) |
 | `children` | Nested outline items |
+
+Drag or paste a file onto the editor to create an **attachment** block. The binary is written under `attachments/`; the day JSON only stores the relative path and metadata. For **images**, use the ⋯ menu for **Small / Medium / Large / Full width**, **Add caption**, or **View full screen** (clicking the image also opens the lightbox). `displaySize` defaults to `"medium"`.
 
 `manifest.json` lists known day keys and is regenerated whenever days are saved or removed.
 

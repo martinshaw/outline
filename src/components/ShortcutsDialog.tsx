@@ -60,6 +60,10 @@ const SECTIONS: Section[] = [
     title: 'Selection',
     shortcuts: [
       { keys: ['Click gutter'], action: 'Select block' },
+      {
+        keys: ['Click gutter'],
+        action: 'Again on a parent: select parent only (children stay on move)',
+      },
       { keys: ['Drag gutter'], action: 'Multi-select contiguous blocks' },
       { keys: ['⇧', 'Click gutter'], action: 'Extend selection' },
       { keys: [alt, 'Drag'], action: 'Multi-select without gutter' },

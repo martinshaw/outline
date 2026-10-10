@@ -30,6 +30,9 @@ function isUiChromeTarget(target: EventTarget | null): boolean {
         '.outline-status-menu',
         '.outline-meta',
         '.outline-meta-popover',
+        '.outline-attachment',
+        '.outline-attachment-menu',
+        '.outline-attachment-lightbox',
       ].join(','),
     ),
   );

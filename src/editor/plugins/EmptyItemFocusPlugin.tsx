@@ -68,7 +68,10 @@ export function EmptyItemFocusPlugin(): null {
         target.closest('.outline-status-chip') ||
         target.closest('.outline-status-menu') ||
         target.closest('.outline-meta') ||
-        target.closest('.outline-meta-popover')
+        target.closest('.outline-meta-popover') ||
+        target.closest('.outline-attachment') ||
+        target.closest('.outline-attachment-menu') ||
+        target.closest('.outline-attachment-lightbox')
       ) {
         return;
       }

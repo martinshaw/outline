@@ -74,6 +74,9 @@ function kindPrefix(item: OutlineItem): string {
     const status = item.status ? `:${item.status}` : '';
     return `[${item.kind}${status}] `;
   }
+  if (item.kind === 'attachment' && item.attachment) {
+    return `[file:${item.attachment.path}] `;
+  }
   return '';
 }
 

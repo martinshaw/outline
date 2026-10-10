@@ -13,12 +13,17 @@ export function segmentsToPlainText(segments: InlineSegment[]): string {
 
 export function itemTitle(item: OutlineItem): string {
   const text = segmentsToPlainText(item.content).trim();
-  return text || 'Untitled';
+  if (text) return text;
+  if (item.kind === 'attachment' && item.attachment?.name) {
+    return item.attachment.name;
+  }
+  return 'Untitled';
 }
 
 export function isDayEmpty(doc: DayDocument): boolean {
   const walk = (items: OutlineItem[]): boolean => {
     for (const item of items) {
+      if (item.kind === 'attachment' && item.attachment?.path) return false;
       if (segmentsToPlainText(item.content).trim().length > 0) return false;
       if (!walk(item.children)) return false;
     }

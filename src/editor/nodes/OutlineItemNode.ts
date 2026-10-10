@@ -11,8 +11,21 @@ import {
   type SerializedElementNode,
   type Spread,
 } from 'lexical';
-import { getBlockSelectedIds } from '../blockSelectionStore';
+import {
+  getBlockSelectedIds,
+  isBlockSelfOnly,
+  syncSelfOnlyHighlightVar,
+} from '../blockSelectionStore';
 import { getStatusDef } from '../../settings/settingsStore';
+import {
+  attachmentKindFromMime,
+  formatAttachmentSize,
+  getCachedAttachmentUrl,
+  normalizeAttachmentMeta,
+  normalizeDisplaySize,
+  type AttachmentMeta,
+} from '../../storage/attachments';
+import { notesClient } from '../../storage/notesClient';
 import {
   isRoleKind,
   normalizeItemKind,
@@ -36,6 +49,7 @@ export type SerializedOutlineItemNode = Spread<
     status: string | null;
     deadline: string | null;
     entities: string[];
+    attachment: AttachmentMeta | null;
     type: 'outline-item';
     /** 2 = task/subtask kinds; 1 = legacy project/task. */
     version: 1 | 2;
@@ -59,6 +73,7 @@ export class OutlineItemNode extends ElementNode {
   __status: string | null;
   __deadline: string | null;
   __entities: string[];
+  __attachment: AttachmentMeta | null;
   __blockSelected: boolean;
 
   static getType(): string {
@@ -74,6 +89,7 @@ export class OutlineItemNode extends ElementNode {
       node.__key,
       node.__deadline,
       node.__entities,
+      node.__attachment,
     );
   }
 
@@ -85,6 +101,7 @@ export class OutlineItemNode extends ElementNode {
     key?: NodeKey,
     deadline: string | null = null,
     entities: string[] | null = null,
+    attachment: AttachmentMeta | null = null,
   ) {
     super(key);
     this.__id = id;
@@ -94,6 +111,8 @@ export class OutlineItemNode extends ElementNode {
     this.__status = isRole ? status : null;
     this.__deadline = isRole && deadline && isIsoDate(deadline) ? deadline : null;
     this.__entities = isRole ? normalizeEntities(entities) : [];
+    this.__attachment =
+      kind === 'attachment' ? normalizeAttachmentMeta(attachment) : null;
     this.__blockSelected = false;
   }
 
@@ -108,11 +127,12 @@ export class OutlineItemNode extends ElementNode {
   setKind(kind: ItemKind): this {
     const writable = this.getWritable();
     writable.__kind = kind;
-    if (kind === 'note' || kind === 'heading') {
+    if (kind === 'note' || kind === 'heading' || kind === 'attachment') {
       writable.__status = null;
       writable.__deadline = null;
       writable.__entities = [];
     }
+    if (kind !== 'attachment') writable.__attachment = null;
     if (kind !== 'heading') writable.__headingLevel = null;
     else if (writable.__headingLevel == null) writable.__headingLevel = 1;
     writable.markAncestorTasksDirty();
@@ -137,6 +157,7 @@ export class OutlineItemNode extends ElementNode {
     writable.__status = null;
     writable.__deadline = null;
     writable.__entities = [];
+    writable.__attachment = null;
     writable.markAncestorTasksDirty();
     return writable;
   }
@@ -173,6 +194,18 @@ export class OutlineItemNode extends ElementNode {
     return writable;
   }
 
+  getAttachment(): AttachmentMeta | null {
+    const att = this.getLatest().__attachment;
+    return att ? { ...att } : null;
+  }
+
+  setAttachment(attachment: AttachmentMeta | null): this {
+    const writable = this.getWritable();
+    writable.__attachment = normalizeAttachmentMeta(attachment);
+    if (writable.__attachment) writable.__kind = 'attachment';
+    return writable;
+  }
+
   isBlockSelected(): boolean {
     return this.getLatest().__blockSelected;
   }
@@ -197,15 +230,15 @@ export class OutlineItemNode extends ElementNode {
   }
 
   /**
-   * DOM: [status chip?][editable children…][meta][progress].
-   * Chip leads so the caret sits after it (flex order alone left the caret
-   * stranded before the chip on empty task rows).
+   * DOM: [attachment|chip?][editable children…][meta][progress].
+   * Leading chrome so the caret sits after previews/chips.
    */
   getDOMSlot(element: HTMLElement): ElementDOMSlot {
     let slot = super.getDOMSlot(element);
     const host = element as HTMLElement & {
       __outlineStatusChip?: HTMLElement | null;
       __outlineMeta?: HTMLElement | null;
+      __outlineAttachment?: HTMLElement | null;
     };
     const meta =
       host.__outlineMeta?.isConnected
@@ -215,7 +248,12 @@ export class OutlineItemNode extends ElementNode {
       host.__outlineStatusChip?.isConnected
         ? host.__outlineStatusChip
         : element.querySelector(':scope > .outline-status-chip');
-    if (chip) slot = slot.withAfter(chip);
+    const attachment =
+      host.__outlineAttachment?.isConnected
+        ? host.__outlineAttachment
+        : element.querySelector(':scope > .outline-attachment');
+    if (attachment) slot = slot.withAfter(attachment);
+    else if (chip) slot = slot.withAfter(chip);
     if (meta) slot = slot.withBefore(meta);
     return slot;
   }
@@ -234,6 +272,9 @@ export class OutlineItemNode extends ElementNode {
     const labelText = kindLabelFor(this.__kind, this.__headingLevel);
     if (labelText) dom.setAttribute('data-kind-label', labelText);
     else dom.removeAttribute('data-kind-label');
+    const selfOnly =
+      getBlockSelectedIds().has(this.__id) && isBlockSelfOnly(this.__id);
+    syncSelfOnlyHighlightVar(dom, selfOnly);
     this.syncChrome(dom);
   }
 
@@ -271,6 +312,7 @@ export class OutlineItemNode extends ElementNode {
       __outlineStatusChip?: HTMLButtonElement | null;
       __outlineMeta?: HTMLButtonElement | null;
       __outlineSubtaskProgress?: HTMLElement | null;
+      __outlineAttachment?: HTMLElement | null;
     };
 
     // Drop legacy DOM chrome (bullet/label spans) if present from older builds.
@@ -290,6 +332,25 @@ export class OutlineItemNode extends ElementNode {
       host.__outlineSubtaskProgress?.isConnected
         ? host.__outlineSubtaskProgress
         : dom.querySelector<HTMLElement>(':scope > .outline-subtask-progress');
+    let attachmentEl =
+      host.__outlineAttachment?.isConnected
+        ? host.__outlineAttachment
+        : dom.querySelector<HTMLElement>(':scope > .outline-attachment');
+
+    if (this.__kind === 'attachment' && this.__attachment) {
+      chip?.remove();
+      meta?.remove();
+      progress?.remove();
+      host.__outlineStatusChip = null;
+      host.__outlineMeta = null;
+      host.__outlineSubtaskProgress = null;
+      dom.classList.remove('outline-item--has-meta');
+      this.syncAttachmentChrome(dom, host, attachmentEl);
+      return;
+    }
+
+    attachmentEl?.remove();
+    host.__outlineAttachment = null;
 
     if (!isRoleKind(this.__kind)) {
       chip?.remove();
@@ -392,6 +453,143 @@ export class OutlineItemNode extends ElementNode {
     );
   }
 
+  private syncAttachmentChrome(
+    dom: HTMLElement,
+    host: HTMLElement & { __outlineAttachment?: HTMLElement | null },
+    existing: HTMLElement | null,
+  ): void {
+    const att = this.__attachment;
+    if (!att) {
+      existing?.remove();
+      host.__outlineAttachment = null;
+      return;
+    }
+
+    const mediaKind = attachmentKindFromMime(att.mime);
+    let wrap = existing;
+    if (!wrap || wrap.dataset.mediaKind !== mediaKind) {
+      wrap?.remove();
+      wrap = document.createElement('div');
+      wrap.className = 'outline-attachment';
+      wrap.contentEditable = 'false';
+      wrap.dataset.mediaKind = mediaKind;
+      dom.insertBefore(wrap, dom.firstChild);
+    } else if (wrap.parentElement !== dom || dom.firstChild !== wrap) {
+      dom.insertBefore(wrap, dom.firstChild);
+    }
+    host.__outlineAttachment = wrap;
+
+    wrap.dataset.path = att.path;
+    wrap.dataset.name = att.name;
+    wrap.dataset.mime = att.mime;
+    wrap.title = att.name;
+
+    const sizeLabel = formatAttachmentSize(att.size);
+    const ensureMedia = <K extends keyof HTMLElementTagNameMap>(
+      tag: K,
+      className: string,
+    ): HTMLElementTagNameMap[K] => {
+      let el = wrap!.querySelector<HTMLElementTagNameMap[K]>(`:scope > ${tag}`);
+      if (!el) {
+        wrap!.replaceChildren();
+        el = document.createElement(tag);
+        el.className = className;
+        wrap!.appendChild(el);
+      }
+      return el;
+    };
+
+    if (mediaKind === 'image') {
+      const displaySize = normalizeDisplaySize(att.displaySize);
+      wrap.className = `outline-attachment outline-attachment--${displaySize}`;
+      wrap.dataset.displaySize = displaySize;
+
+      let img = wrap.querySelector<HTMLImageElement>(
+        ':scope > .outline-attachment__image',
+      );
+      let menuBtn = wrap.querySelector<HTMLButtonElement>(
+        ':scope > .outline-attachment__menu-btn',
+      );
+      if (!img || !menuBtn) {
+        wrap.replaceChildren();
+        img = document.createElement('img');
+        img.className = 'outline-attachment__image';
+        menuBtn = document.createElement('button');
+        menuBtn.type = 'button';
+        menuBtn.className = 'outline-attachment__menu-btn';
+        menuBtn.setAttribute('aria-label', 'Image options');
+        menuBtn.setAttribute('aria-haspopup', 'menu');
+        menuBtn.setAttribute('aria-expanded', 'false');
+        menuBtn.textContent = '⋯';
+        wrap.append(img, menuBtn);
+      }
+
+      img.alt = att.name;
+      img.draggable = false;
+      img.title = `${att.name} · click to view full screen`;
+      const cached = getCachedAttachmentUrl(att.path);
+      if (cached && img.getAttribute('src') !== cached) img.src = cached;
+      else if (!cached && img.dataset.loading !== att.path) {
+        img.dataset.loading = att.path;
+        void notesClient.getAttachmentObjectUrl(att.path).then((url) => {
+          if (!url || !img.isConnected) return;
+          if (img.dataset.loading !== att.path) return;
+          img.src = url;
+          delete img.dataset.loading;
+        });
+      }
+      return;
+    }
+
+    wrap.className = 'outline-attachment';
+    delete wrap.dataset.displaySize;
+
+    if (mediaKind === 'audio' || mediaKind === 'video') {
+      const tag = mediaKind === 'audio' ? 'audio' : 'video';
+      const media = ensureMedia(tag, `outline-attachment__${mediaKind}`);
+      media.controls = true;
+      media.preload = 'metadata';
+      if (mediaKind === 'video') {
+        (media as HTMLVideoElement).playsInline = true;
+      }
+      const cached = getCachedAttachmentUrl(att.path);
+      if (cached && media.getAttribute('src') !== cached) media.src = cached;
+      else if (!cached && media.dataset.loading !== att.path) {
+        media.dataset.loading = att.path;
+        void notesClient.getAttachmentObjectUrl(att.path).then((url) => {
+          if (!url || !media.isConnected) return;
+          if (media.dataset.loading !== att.path) return;
+          media.src = url;
+          delete media.dataset.loading;
+        });
+      }
+      return;
+    }
+
+    let link = wrap.querySelector<HTMLAnchorElement>(':scope > .outline-attachment__file');
+    if (!link) {
+      wrap.replaceChildren();
+      link = document.createElement('a');
+      link.className = 'outline-attachment__file';
+      link.rel = 'noopener noreferrer';
+      wrap.appendChild(link);
+    }
+    const label = sizeLabel ? `${att.name} · ${sizeLabel}` : att.name;
+    if (link.textContent !== label) link.textContent = label;
+    link.download = att.name;
+    const cached = getCachedAttachmentUrl(att.path);
+    if (cached && link.getAttribute('href') !== cached) link.href = cached;
+    else if (!cached && link.dataset.loading !== att.path) {
+      link.dataset.loading = att.path;
+      void notesClient.getAttachmentObjectUrl(att.path).then((url) => {
+        if (!url || !link!.isConnected) return;
+        if (link!.dataset.loading !== att.path) return;
+        link!.href = url;
+        delete link!.dataset.loading;
+      });
+    }
+  }
+
   private buildClassName(): string {
     const parts = ['outline-item', `outline-item--${this.__kind}`];
     if (this.__kind === 'heading' && this.__headingLevel) {
@@ -402,6 +600,7 @@ export class OutlineItemNode extends ElementNode {
       this.__blockSelected || getBlockSelectedIds().has(this.__id);
     if (selected) {
       parts.push('outline-item--selected');
+      if (isBlockSelfOnly(this.__id)) parts.push('outline-item--self-only');
       const parent = this.getParent();
       const parentSelected =
         $isOutlineItemNode(parent) && getBlockSelectedIds().has(parent.getId());
@@ -437,6 +636,7 @@ export class OutlineItemNode extends ElementNode {
       status: this.__status,
       deadline: this.__deadline,
       entities: this.__entities,
+      attachment: this.__attachment,
       type: 'outline-item',
       version: 2,
     };
@@ -455,6 +655,7 @@ export class OutlineItemNode extends ElementNode {
       serialized.headingLevel ?? null,
       serialized.deadline ?? null,
       serialized.entities ?? legacy.people ?? null,
+      serialized.attachment ?? null,
     );
   }
 
@@ -489,6 +690,7 @@ function kindLabelFor(
   }
   if (kind === 'task') return 'Task';
   if (kind === 'subtask') return 'Subtask';
+  if (kind === 'attachment') return 'File';
   return null;
 }
 
@@ -513,6 +715,7 @@ export function $createOutlineItemNode(
   headingLevel: HeadingLevel | null = null,
   deadline: string | null = null,
   entities: string[] | null = null,
+  attachment: AttachmentMeta | null = null,
 ): OutlineItemNode {
   return $applyNodeReplacement(
     new OutlineItemNode(
@@ -523,6 +726,7 @@ export function $createOutlineItemNode(
       undefined,
       deadline,
       entities,
+      attachment,
     ),
   );
 }

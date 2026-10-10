@@ -29,6 +29,10 @@
   /* Light mode: soft light veil; dark mode: dark scrim */
   --dialog-backdrop: rgb(255 255 255 / 0.54);
   --dialog-edge: color-mix(in srgb, var(--ink) 12%, var(--line));
+  /* Plus cursor for block-select gutter (hotspot centered) */
+  --cursor-gutter-plus: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath stroke='%231a1f1c' stroke-width='1.75' stroke-linecap='square' fill='none' d='M12 5v14M5 12h14'/%3E%3C/svg%3E")
+      12 12,
+    cell;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -50,6 +54,9 @@
     --theme-color: #000000;
     --dialog-backdrop: rgb(0 0 0 / 0.72);
     --dialog-edge: color-mix(in srgb, var(--ink) 14%, var(--line));
+    --cursor-gutter-plus: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath stroke='%23e8e4db' stroke-width='1.75' stroke-linecap='square' fill='none' d='M12 5v14M5 12h14'/%3E%3C/svg%3E")
+        12 12,
+      cell;
   }
 }
 
@@ -71,6 +78,9 @@
   --theme-color: #000000;
   --dialog-backdrop: rgb(0 0 0 / 0.72);
   --dialog-edge: color-mix(in srgb, var(--ink) 14%, var(--line));
+  --cursor-gutter-plus: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath stroke='%23e8e4db' stroke-width='1.75' stroke-linecap='square' fill='none' d='M12 5v14M5 12h14'/%3E%3C/svg%3E")
+      12 12,
+    cell;
 }
 
 :root[data-theme='light'] {
@@ -124,7 +134,9 @@ select {
 /* Keep editor chrome non-selectable even inside the contenteditable */
 .editor-input .outline-status-chip,
 .editor-input .outline-status-menu,
-.editor-input .outline-status-menu * {
+.editor-input .outline-status-menu *,
+.editor-input .outline-attachment-menu,
+.editor-input .outline-attachment-menu * {
   user-select: none;
   -webkit-user-select: none;
 }
@@ -950,6 +962,11 @@ body:has(.update-banner) .toast-host {
   cursor: text;
 }
 
+/* Block-select gutter (class toggled from BlockSelectionPlugin) */
+.outline-item.outline-item--gutter-cursor {
+  cursor: var(--cursor-gutter-plus);
+}
+
 /*
  * Nested rows: small nest step only. Do not re-apply the root kind-label
  * column (that was stacking ~4rem+ per level into a staircase).
@@ -1098,6 +1115,241 @@ body:has(.update-banner) .toast-host {
   box-sizing: border-box;
 }
 
+/* Attachment preview (image / audio / video / file chip) */
+.outline-item--attachment {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  column-gap: 0.5rem;
+  row-gap: 0.35rem;
+}
+
+.outline-item--attachment > .outline-attachment {
+  order: 0;
+  flex: 1 1 100%;
+  min-width: 0;
+  max-width: min(36rem, 100%);
+}
+
+.outline-item--attachment > :not(.outline-attachment):not(.outline-item) {
+  order: 1;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.outline-item--attachment > .outline-item {
+  order: 2;
+  flex: 1 1 100%;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.outline-attachment {
+  position: relative;
+  margin: 0.15rem 0 0.1rem;
+  user-select: none;
+}
+
+.outline-attachment__image {
+  display: block;
+  max-width: 100%;
+  width: auto;
+  height: auto;
+  border-radius: 3px;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--paper-deep) 55%, transparent);
+  object-fit: contain;
+  cursor: zoom-in;
+}
+
+.outline-attachment--small .outline-attachment__image {
+  max-width: 8rem;
+  max-height: 8rem;
+}
+
+.outline-attachment--medium .outline-attachment__image {
+  max-width: 16rem;
+  max-height: 14rem;
+}
+
+.outline-attachment--large .outline-attachment__image {
+  max-width: 28rem;
+  max-height: 22rem;
+}
+
+.outline-attachment--full .outline-attachment__image {
+  max-width: 100%;
+  max-height: min(70vh, 40rem);
+  width: 100%;
+}
+
+.outline-attachment__menu-btn {
+  appearance: none;
+  position: absolute;
+  top: 0.35rem;
+  right: 0.35rem;
+  z-index: 2;
+  margin: 0;
+  padding: 0.1rem 0.4rem;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--paper) 88%, transparent);
+  color: var(--ink-muted);
+  font-size: 0.95rem;
+  line-height: 1.2;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.outline-attachment:hover .outline-attachment__menu-btn,
+.outline-attachment__menu-btn:focus-visible,
+.outline-attachment__menu-btn[aria-expanded='true'] {
+  opacity: 1;
+}
+
+.outline-attachment__menu-btn:hover {
+  color: var(--ink);
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--line));
+}
+
+.outline-attachment-menu {
+  position: fixed;
+  z-index: 4000;
+  min-width: 9.5rem;
+  padding: 0.3rem;
+  border: 1px solid var(--dialog-edge);
+  border-radius: 4px;
+  background: var(--paper);
+  box-shadow: 0 8px 24px color-mix(in srgb, #000 18%, transparent);
+}
+
+.outline-attachment-menu__label {
+  padding: 0.25rem 0.45rem 0.15rem;
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+.outline-attachment-menu__divider {
+  height: 1px;
+  margin: 0.3rem 0.2rem;
+  background: var(--line);
+}
+
+.outline-attachment-menu__option {
+  appearance: none;
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0.35rem 0.5rem;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.82rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.outline-attachment-menu__option:hover,
+.outline-attachment-menu__option--active {
+  background: color-mix(in srgb, var(--accent) 12%, var(--paper));
+}
+
+.outline-attachment-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 5000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 1.5rem;
+  background: color-mix(in srgb, #000 72%, transparent);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+}
+
+.outline-attachment-lightbox__image {
+  max-width: min(96vw, 100%);
+  max-height: min(82vh, 100%);
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  border-radius: 2px;
+  box-shadow: 0 12px 40px color-mix(in srgb, #000 45%, transparent);
+}
+
+.outline-attachment-lightbox__caption {
+  margin: 0;
+  max-width: min(40rem, 90vw);
+  color: #f2f2f2;
+  font-size: 0.85rem;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.outline-attachment-lightbox__close {
+  appearance: none;
+  position: absolute;
+  top: max(0.75rem, env(safe-area-inset-top));
+  right: max(0.75rem, env(safe-area-inset-right));
+  margin: 0;
+  padding: 0.2rem 0.55rem;
+  border: 1px solid color-mix(in srgb, #fff 35%, transparent);
+  border-radius: 3px;
+  background: color-mix(in srgb, #000 35%, transparent);
+  color: #fff;
+  font-size: 1.35rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.outline-attachment__video {
+  display: block;
+  max-width: 100%;
+  max-height: 22rem;
+  width: 100%;
+  border-radius: 3px;
+  border: 1px solid var(--line);
+  background: #000;
+}
+
+.outline-attachment__audio {
+  display: block;
+  width: min(24rem, 100%);
+  max-width: 100%;
+}
+
+.outline-attachment__file {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  padding: 0.35rem 0.55rem;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--paper-deep) 50%, transparent);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.outline-attachment__file:hover {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+  color: var(--accent);
+}
+
 .outline-meta {
   appearance: none;
   display: inline-flex;
@@ -1171,11 +1423,74 @@ body:has(.update-banner) .toast-host {
   gap: 0.55rem;
 }
 
+.outline-meta-popover__entity-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
 .outline-meta-popover__field {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
   position: relative;
+}
+
+.outline-meta-popover__add-type {
+  position: relative;
+}
+
+.outline-meta-popover__add-type-btn {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  width: 100%;
+  margin: 0;
+  padding: 0.35rem 0.45rem;
+  border: 1px dashed color-mix(in srgb, var(--line) 85%, var(--ink-muted));
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ink-muted);
+  font-family: var(--font-display);
+  font-size: 0.82rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.outline-meta-popover__add-type-btn:hover {
+  color: var(--ink);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+  background: color-mix(in srgb, var(--accent-soft) 35%, transparent);
+}
+
+.outline-meta-popover__add-type-menu {
+  position: absolute;
+  z-index: 2;
+  top: calc(100% + 2px);
+  left: 0;
+  right: 0;
+  margin: 0;
+  padding: 0.2rem;
+  list-style: none;
+  max-height: 11rem;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--paper);
+  box-shadow: 0 6px 16px color-mix(in srgb, #000 22%, transparent);
+}
+
+.outline-meta-popover__add-type-option {
+  padding: 0.35rem 0.45rem;
+  border-radius: 3px;
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.outline-meta-popover__add-type-option:hover {
+  background: color-mix(in srgb, var(--accent-soft) 75%, transparent);
 }
 
 .outline-meta-popover__label {
@@ -1419,13 +1734,35 @@ body:has(.update-banner) .toast-host {
   right: calc(100% - var(--outline-bullet-x) - var(--outline-sel-pad));
 }
 
-/* Selected parent visually includes descendants */
-.outline-item--selected .outline-item {
+/* Selected parent visually includes descendants (unless self-only) */
+.outline-item--selected:not(.outline-item--self-only) .outline-item {
   background: color-mix(in srgb, var(--accent-soft) 45%, transparent);
 }
 
 .outline-item--selected .outline-item--selected {
   background: color-mix(in srgb, var(--accent-soft) 70%, transparent);
+}
+
+/*
+ * Self-only: don't fill the whole parent box (that paints behind children).
+ * Clip the wash to --outline-self-sel-h (viewport offset of first nested row).
+ */
+.outline-item--selected.outline-item--self-only {
+  background-color: transparent;
+  background-image:
+    linear-gradient(
+      color-mix(in srgb, var(--accent-soft) 70%, transparent),
+      color-mix(in srgb, var(--accent-soft) 70%, transparent)
+    ),
+    linear-gradient(
+      color-mix(in srgb, var(--accent) 55%, transparent),
+      color-mix(in srgb, var(--accent) 55%, transparent)
+    );
+  background-size:
+    calc(100% - 2px) calc(var(--outline-self-sel-h, 1.85lh) - 2px),
+    100% var(--outline-self-sel-h, 1.85lh);
+  background-position: 1px 1px, 0 0;
+  background-repeat: no-repeat;
 }
 
 /* Drag handles live in an overlay — never inside contenteditable item DOM */
@@ -1453,6 +1790,7 @@ body:has(.update-banner) .toast-host {
   background: var(--ink);
   color: var(--paper);
   cursor: grab;
+  cursor: -webkit-grab;
   pointer-events: auto;
   user-select: none;
   -webkit-user-select: none;
@@ -1463,12 +1801,15 @@ body:has(.update-banner) .toast-host {
   background: var(--accent);
   color: var(--paper);
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 80%, var(--paper));
+  cursor: grab;
+  cursor: -webkit-grab;
 }
 
 .outline-block-handle:active,
 .editor-input.block-moving ~ .outline-block-handle-layer .outline-block-handle,
 .editor-shell:has(.editor-input.block-moving) .outline-block-handle {
   cursor: grabbing;
+  cursor: -webkit-grabbing;
 }
 
 .outline-block-handle__grip {
