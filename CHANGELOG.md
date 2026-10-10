@@ -2,6 +2,10 @@
 
 Notes for each tagged release, drawn from merged pull-request summaries.
 
+## 1.3.1 — 2026-10-10
+
+- Bring README in line with 1.3.0: version badge, themes/fonts grids, get-started hints, confetti, tasks bulk select, search “items” wording, settings schema notes
+
 ## 1.3.0 — 2026-10-10
 
 - Empty-day get-started hints (local-first note, numbered tips, dismiss via × or 1 minute after typing starts); command palette **Show get started hints**

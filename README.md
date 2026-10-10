@@ -1,6 +1,6 @@
 # Outline
 
-**Version 1.1.1** · [Live demo](https://martinshaw.github.io/outline/) · [Repository](https://github.com/martinshaw/outline)
+**Version 1.3.1** · [Live demo](https://martinshaw.github.io/outline/) · [Repository](https://github.com/martinshaw/outline)
 
 Local-first chronological outline editor inspired by [LogSeq](https://logseq.com). Notes live in a folder on your computer via Chrome’s File System Access API — no account, no server, no sync backend.
 
@@ -46,8 +46,9 @@ Built with [React](https://react.dev), [Lexical](https://lexical.dev), [Vite](ht
 | **Daily notes** | One outline document per calendar day (`YYYY-MM-DD`) |
 | **Nested outliner** | Indent, outdent, and reorder with LogSeq-style tree moves |
 | **Tasks & subtasks** | Promote blocks; subtasks nest under tasks |
-| **Tasks table** | Filterable cross-note task dialog (`⌘⌥T`); change status or jump to a block |
+| **Tasks table** | Filterable cross-note task dialog (`⌘⌥T`); multi-select, bulk status, jump to an item |
 | **Search** | Full-text search across all notes (`⌘⌥F`) with an inverted index |
+| **Get started hints** | Tips on empty days (local-first note); dismiss or auto-hide; restore from the command palette |
 | **Status chips** | Inline coloured chips on tasks/subtasks; configurable statuses |
 | **Deadlines & entities** | Tagline on tasks/subtasks; link workspace entities; `⌘⌥A` |
 | **Kind labels** | Quiet gutter labels for tasks, subtasks, and heading levels |
@@ -61,8 +62,9 @@ Built with [React](https://react.dev), [Lexical](https://lexical.dev), [Vite](ht
 | **Backups** | Snapshot notes edited yesterday when you first write today |
 | **Settings** | Stored as `settings.json` in your workspace folder |
 | **Developer panel** | Optional bottom-right panel: Overview, Nodes, Files (off by default) |
-| **Theme** | System, light, or dark (flat dark; no decorative page glow) |
-| **Fonts** | Built-in + searchable system fonts (Local Font Access) |
+| **Themes** | System / Light / Dark / High contrast plus Nord, Forest, Ocean, Sunset, Espresso, Terminal, Neon, Miami Vice |
+| **Fonts** | Built-in + searchable system fonts (Local Font Access); exploration grid in Settings |
+| **Confetti** | Optional celebration when every subtask under a task is done/archived |
 | **Offline PWA** | Installable app shell; works offline after first visit; data stays on disk |
 | **Phone-friendly** | Drawer navigation, safe areas, touch targets; install from Chrome on Android |
 
@@ -123,6 +125,7 @@ Serve `dist/` over HTTPS (or localhost) if you host it yourself.
 - Each day is a separate JSON file under `notes/`.
 - Empty days are removed from disk automatically (today can stay open in the UI even if empty).
 - Switch days from the sidebar or keep editing older notes; saves still go to that day’s file.
+- On an **empty day**, gentle **Get started** tips appear above the editor (local-first privacy note, shortcuts, attachments). Dismiss with ×, or they hide about a minute after you start typing. Restore anytime via the command palette (**Show get started hints**).
 
 ### Sidebar
 
@@ -143,7 +146,7 @@ On a **task** or **subtask**, `⌘Enter` / `Ctrl+Enter` **cycles status**; after
 
 Tasks and subtasks can also carry a **deadline** and linked **entities**. When set, they appear as muted text after the title (`Due Fri 11 · Ada, Acme`). Hover a task/subtask with no attributes to reveal **Deadline · Entities** at the end of the title, then click to edit. Shortcut: **`⌘⌥A` / `Ctrl+Alt+A`** (also in the command palette).
 
-**Entities** live in workspace `entities.json`. Attribute editing shows one multiselect per configured type (Settings → Entities; defaults **People**, **Company**, and **Project**). Type to pick an existing name, or press Enter when nothing matches to create a new entity of that type. Day items store **entity ids**, so the same objects can be reused across days and used to relate tasks/subtasks by shared factors.
+**Entities** live in workspace `entities.json`. Attribute editing starts with deadline only; use **+ Add entity type** to show a multiselect for People, Company, Project, or other types from Settings → Entities (keyboard: ↑↓ / Enter / Esc). Type to pick an existing name, or press Enter when nothing matches to create a new entity of that type. Day items store **entity ids**, so the same objects can be reused across days and used to relate tasks/subtasks by shared factors.
 
 Default statuses (editable in Settings → Statuses):
 
@@ -202,6 +205,7 @@ Open with **`⌘P` / `Ctrl+P`**. Type to filter; `↑` `↓` and `Enter` to run.
 | **Insert test hierarchy** | Sample nested outline (only when developer mode is on) |
 | **Manage tasks** | Filterable table of tasks/subtasks across notes (`⌘⌥T`) |
 | **Search notes** | Full-text search across every day (`⌘⌥F`) |
+| **Show get started hints** | Restore empty-day tips above the editor |
 | **Keyboard shortcuts** | Same as `?` or `⌘/` / `Ctrl+/` |
 | **Settings** | Font, theme, statuses, backups, autosave |
 | **Edit deadline & entities** | Attributes on the current task/subtask (`⌘⌥A`) |
@@ -222,18 +226,19 @@ The dialog indexes every task and subtask in the loaded notes cache and shows th
 - Hide completed (done / archived) by default
 - Sort by note, title, kind, status, or deadline
 - Change status inline (saves the day file)
-- Click a row (or `Enter`) to jump to that block in the editor
+- Finder-style multi-select and **bulk status** updates for the selection
+- Click a row (or `Enter`) to jump to that item in the editor
 
 ### Search notes
 
 Open with **`⌘⌥F` / `Ctrl+Alt+F`**, the command palette (**Search notes**), or the top-right hint.
 
-Outline builds an **inverted full-text index** over every outline block in the loaded notes cache:
+Outline builds an **inverted full-text index** over every outline item in the loaded notes cache:
 
 - Chunked rebuild when you open a workspace (keeps the UI responsive with many days)
 - Incremental reindex of a day as you edit or save
 - Token AND matching with prefix completion on the last word
-- Snippets with highlighted matches; `Enter` / click jumps to the block
+- Snippets with highlighted matches; `Enter` / click jumps to the item
 
 ### Settings
 
@@ -241,10 +246,11 @@ Open **Settings** with **`⌘⌥,` / `Ctrl+Alt+,`** or from the command palette.
 
 | Section | Options |
 |---------|---------|
-| **Editor → Font** | Built-in presets, loaded system fonts, **Add system fonts…** (Local Font Access); type to search |
+| **Editor → Font** | Exploration grid: built-in presets, loaded system fonts, **Add system fonts…** (Local Font Access); type to search |
 | **Editor → Size** | Slider 0.7–1.4rem (default **1.05rem** in the middle) |
-| **Appearance → Theme** | System, Light, Dark |
+| **Appearance → Theme** | Exploration grid: System, Light, Dark, High contrast, Nord, Forest, Ocean, Sunset, Espresso, Terminal, Neon, Miami Vice |
 | **Appearance → Collapse sidebar** | Also toggled from the command palette |
+| **Appearance → Confetti** | Celebrate when every subtask under a task becomes done/archived (on by default) |
 | **Statuses** | Labels and colours for task/subtask chips; add / remove / reset list |
 | **Entities** | Types for attribute multiselects (default People, Company, Project); catalog in `entities.json` |
 | **Backups → When to backup** | On next day’s first write (default), or Off |
@@ -461,9 +467,12 @@ Enumerable objects shared across the workspace. Types are configured in Settings
   "backupMode": "on-next-day-write",
   "backupDirectory": "backups",
   "saveDebounceMs": 400,
-  "developerMode": false
+  "developerMode": false,
+  "taskCompleteConfetti": true
 }
 ```
+
+`theme` may also be a named palette id such as `"nord"`, `"miami-vice"`, or `"terminal"` (see Appearance → Theme in Settings).
 
 Until a folder is opened, the app uses in-memory defaults. Opening a folder loads (or creates) this file.
 
