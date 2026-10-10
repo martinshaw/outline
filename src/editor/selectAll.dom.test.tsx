@@ -12,6 +12,7 @@ function Host({ doc }: { doc: DayDocument }) {
       date={document.date}
       document={document}
       enabled
+      focusFirstLineKey={0}
       focusItemId={null}
       onFocusHandled={() => {}}
       onSave={async () => {}}

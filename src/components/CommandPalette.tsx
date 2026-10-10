@@ -44,10 +44,11 @@ type Props = {
   onOpenSettings: () => void;
   onOpenTasks: () => void;
   onOpenSearch: () => void;
+  onShowEmptyHints: () => void;
   onExportMessage?: (message: string | null) => void;
 };
 
-type Command = {
+export type Command = {
   id: string;
   group: string;
   label: string;
@@ -70,7 +71,8 @@ const isMac =
 const mod = isMac ? '⌘' : 'Ctrl';
 const alt = isMac ? '⌥' : 'Alt';
 
-function scoreCommand(query: string, command: Command): number {
+/** Rank a palette command against the filter query (higher is better). */
+export function scoreCommand(query: string, command: Command): number {
   const q = query.trim().toLowerCase();
   if (!q) return 1;
   const hay = `${command.label} ${command.group} ${command.keywords ?? ''}`.toLowerCase();
@@ -81,6 +83,14 @@ function scoreCommand(query: string, command: Command): number {
   if (tokens.length > 1 && tokens.every((t) => hay.includes(t))) return 40;
   return 0;
 }
+
+/** Static metadata for the get-started tips command (tested + used in the palette). */
+export const SHOW_EMPTY_HINTS_COMMAND = {
+  id: 'empty-hints',
+  group: 'Workspace',
+  label: 'Show get started hints',
+  keywords: 'onboarding tips help empty tutorial intro',
+} as const;
 
 function scrollCommandIntoView(list: HTMLElement, el: HTMLElement) {
   const group = el.closest('.command-palette__group');
@@ -117,6 +127,7 @@ export function CommandPalette({
   onOpenSettings,
   onOpenTasks,
   onOpenSearch,
+  onShowEmptyHints,
   onExportMessage,
 }: Props) {
   const titleId = useId();
@@ -213,7 +224,7 @@ export function CommandPalette({
         group: 'Workspace',
         label: 'Search notes',
         hint: `${mod}${alt}F`,
-        keywords: 'find full text query filter blocks',
+        keywords: 'find full text query filter items blocks',
         run: run(onOpenSearch),
       },
       {
@@ -223,6 +234,10 @@ export function CommandPalette({
         hint: '?',
         keywords: 'help keymap',
         run: run(onOpenShortcuts),
+      },
+      {
+        ...SHOW_EMPTY_HINTS_COMMAND,
+        run: run(onShowEmptyHints),
       },
       {
         id: 'settings',
@@ -326,7 +341,7 @@ export function CommandPalette({
         id: `export-sel-${format}`,
         group: 'Export selection',
         label: `Export selection as ${label}`,
-        keywords: `download ${format} blocks selected`,
+        keywords: `download ${format} items blocks selected`,
         run: () => runExport('selection', format),
       });
     }
@@ -340,6 +355,7 @@ export function CommandPalette({
     onOpenShortcuts,
     onOpenTasks,
     onOpenSearch,
+    onShowEmptyHints,
     runExport,
     sidebarCollapsed,
   ]);

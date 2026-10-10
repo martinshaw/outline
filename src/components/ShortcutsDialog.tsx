@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef } from 'react';
+import { CloseIcon } from './CloseIcon';
 
 type Shortcut = {
   keys: string[];
@@ -176,7 +177,7 @@ export function ShortcutsDialog({ open, onClose }: Props) {
             aria-label="Close"
             onClick={onClose}
           >
-            ×
+            <CloseIcon size={14} />
           </button>
         </header>
         <div className="shortcuts-dialog__body">

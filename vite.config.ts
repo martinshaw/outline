@@ -13,6 +13,8 @@ export default defineConfig(({ mode }) => {
       environment: 'jsdom',
       include: ['src/**/*.{test,spec}.{ts,tsx}'],
       clearMocks: true,
+      // One jsdom per worker instead of per file (Vitest default recreates 1×/file).
+      pool: 'vmThreads',
     },
     plugins: [
       react(),
@@ -58,12 +60,11 @@ export default defineConfig(({ mode }) => {
         workbox: {
           globPatterns: ['**/*.{js,css,html,svg,ico,woff2}'],
           navigateFallback: 'index.html',
-          mode: 'development',
+          cleanupOutdatedCaches: true,
         },
         devOptions: {
           enabled: false,
         },
-        minify: false,
       }),
     ],
     worker: {

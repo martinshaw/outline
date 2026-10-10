@@ -139,7 +139,8 @@ function openMetaPopover(
     btn.type = 'button';
     btn.className = `${POPOVER_CLASS}__field-clear`;
     btn.setAttribute('aria-label', ariaLabel);
-    btn.textContent = '×';
+    btn.innerHTML =
+      '<svg class="btn__close-icon" width="12" height="12" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 7l10 10M17 7L7 17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
     btn.addEventListener('pointerdown', (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -202,19 +203,34 @@ function openMetaPopover(
   addTypeBtn.className = `${POPOVER_CLASS}__add-type-btn`;
   addTypeBtn.textContent = '+ Add entity type';
 
+  const typeMenuId = `${POPOVER_CLASS}-types-${outlineId}`;
   const typeMenu = document.createElement('ul');
+  typeMenu.id = typeMenuId;
   typeMenu.className = `${POPOVER_CLASS}__add-type-menu`;
   typeMenu.setAttribute('role', 'listbox');
   typeMenu.setAttribute('aria-label', 'Entity types');
   typeMenu.hidden = true;
 
+  let typeHighlight = 0;
+
+  const remainingTypes = () =>
+    typeDefs.filter((t) => !activeTypeFields.has(t.id));
+
+  const typeOptionEls = () =>
+    [
+      ...typeMenu.querySelectorAll<HTMLElement>(
+        `.${POPOVER_CLASS}__add-type-option`,
+      ),
+    ];
+
   const syncAddTypeVisibility = () => {
-    const remaining = typeDefs.filter((t) => !activeTypeFields.has(t.id));
+    const remaining = remainingTypes();
     addTypeWrap.hidden = remaining.length === 0;
     if (remaining.length === 0) {
       typeMenu.hidden = true;
       typePickerOpen = false;
       addTypeBtn.setAttribute('aria-expanded', 'false');
+      addTypeBtn.removeAttribute('aria-activedescendant');
     }
   };
 
@@ -222,15 +238,48 @@ function openMetaPopover(
     typeMenu.hidden = true;
     typePickerOpen = false;
     addTypeBtn.setAttribute('aria-expanded', 'false');
+    addTypeBtn.removeAttribute('aria-activedescendant');
+  };
+
+  const updateTypeHighlight = () => {
+    const opts = typeOptionEls();
+    if (opts.length === 0) {
+      addTypeBtn.removeAttribute('aria-activedescendant');
+      return;
+    }
+    if (typeHighlight >= opts.length) typeHighlight = opts.length - 1;
+    if (typeHighlight < 0) typeHighlight = 0;
+    opts.forEach((el, index) => {
+      const active = index === typeHighlight;
+      el.classList.toggle(`${POPOVER_CLASS}__add-type-option--active`, active);
+      el.setAttribute('aria-selected', active ? 'true' : 'false');
+      if (active) {
+        addTypeBtn.setAttribute('aria-activedescendant', el.id);
+        el.scrollIntoView({ block: 'nearest' });
+      }
+    });
+  };
+
+  const selectTypeAt = (index: number) => {
+    const remaining = remainingTypes();
+    const typeDef = remaining[index];
+    if (!typeDef) return;
+    closeTypeMenu();
+    addEntityTypeField(typeDef.id, typeDef.label, [], true);
   };
 
   const renderTypeMenu = () => {
     typeMenu.replaceChildren();
-    const remaining = typeDefs.filter((t) => !activeTypeFields.has(t.id));
-    for (const typeDef of remaining) {
+    const remaining = remainingTypes();
+    remaining.forEach((typeDef, index) => {
       const opt = document.createElement('li');
+      opt.id = `${typeMenuId}-${typeDef.id}`;
       opt.className = `${POPOVER_CLASS}__add-type-option`;
       opt.setAttribute('role', 'option');
+      opt.setAttribute('aria-selected', index === typeHighlight ? 'true' : 'false');
+      if (index === typeHighlight) {
+        opt.classList.add(`${POPOVER_CLASS}__add-type-option--active`);
+      }
       opt.textContent = typeDef.label;
       opt.addEventListener('pointerdown', (e) => {
         e.preventDefault();
@@ -239,14 +288,27 @@ function openMetaPopover(
       opt.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
-        closeTypeMenu();
-        addEntityTypeField(typeDef.id, typeDef.label, [], true);
+        selectTypeAt(index);
+      });
+      opt.addEventListener('mouseenter', () => {
+        if (typeHighlight === index) return;
+        typeHighlight = index;
+        updateTypeHighlight();
       });
       typeMenu.appendChild(opt);
-    }
+    });
     typeMenu.hidden = remaining.length === 0;
     typePickerOpen = remaining.length > 0;
     addTypeBtn.setAttribute('aria-expanded', typePickerOpen ? 'true' : 'false');
+    if (typePickerOpen) updateTypeHighlight();
+    else addTypeBtn.removeAttribute('aria-activedescendant');
+  };
+
+  const openTypeMenu = (fromEnd = false) => {
+    const remaining = remainingTypes();
+    if (remaining.length === 0) return;
+    typeHighlight = fromEnd ? remaining.length - 1 : 0;
+    renderTypeMenu();
   };
 
   const removeEntityTypeField = (typeId: string) => {
@@ -310,6 +372,7 @@ function openMetaPopover(
 
   addTypeBtn.setAttribute('aria-haspopup', 'listbox');
   addTypeBtn.setAttribute('aria-expanded', 'false');
+  addTypeBtn.setAttribute('aria-controls', typeMenuId);
   addTypeBtn.addEventListener('pointerdown', (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -318,7 +381,68 @@ function openMetaPopover(
     e.preventDefault();
     e.stopPropagation();
     if (typePickerOpen) closeTypeMenu();
-    else renderTypeMenu();
+    else openTypeMenu();
+  });
+  addTypeBtn.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!typePickerOpen) openTypeMenu();
+      else {
+        typeHighlight = Math.min(
+          typeHighlight + 1,
+          Math.max(0, typeOptionEls().length - 1),
+        );
+        updateTypeHighlight();
+      }
+      return;
+    }
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!typePickerOpen) openTypeMenu(true);
+      else {
+        typeHighlight = Math.max(typeHighlight - 1, 0);
+        updateTypeHighlight();
+      }
+      return;
+    }
+    if (e.key === 'Home' && typePickerOpen) {
+      e.preventDefault();
+      e.stopPropagation();
+      typeHighlight = 0;
+      updateTypeHighlight();
+      return;
+    }
+    if (e.key === 'End' && typePickerOpen) {
+      e.preventDefault();
+      e.stopPropagation();
+      typeHighlight = Math.max(0, typeOptionEls().length - 1);
+      updateTypeHighlight();
+      return;
+    }
+    if ((e.key === 'Enter' || e.key === ' ') && typePickerOpen) {
+      e.preventDefault();
+      e.stopPropagation();
+      selectTypeAt(typeHighlight);
+      return;
+    }
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      if (typePickerOpen) {
+        closeTypeMenu();
+        return;
+      }
+      dismiss();
+    }
+  });
+  addTypeBtn.addEventListener('blur', () => {
+    requestAnimationFrame(() => {
+      if (closed || !typePickerOpen) return;
+      if (addTypeWrap.contains(document.activeElement)) return;
+      closeTypeMenu();
+    });
   });
 
   addTypeWrap.append(addTypeBtn, typeMenu);
@@ -328,6 +452,26 @@ function openMetaPopover(
     if (!(e.target instanceof Node)) return;
     if (addTypeWrap.contains(e.target)) return;
     if (typePickerOpen) closeTypeMenu();
+  });
+
+  // Escape from clear buttons / other chrome dismisses the dialog.
+  pop.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape' || e.defaultPrevented) return;
+    if (typePickerOpen) {
+      e.preventDefault();
+      e.stopPropagation();
+      closeTypeMenu();
+      addTypeBtn.focus();
+      return;
+    }
+    const target = e.target;
+    if (!(target instanceof Element)) return;
+    if (target === deadlineInput) return;
+    if (target.closest(`.${POPOVER_CLASS}__ms`)) return;
+    if (target === addTypeBtn) return;
+    e.preventDefault();
+    e.stopPropagation();
+    dismiss();
   });
 
   // Show types that already have linked entities on this item.

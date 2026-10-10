@@ -488,11 +488,14 @@ button {
 
 .btn--icon {
   --btn-fs: 1.35rem;
-  --btn-py: 0.15rem;
-  --btn-px: 0.35rem;
-  line-height: 1;
+  --btn-py: 0;
+  --btn-px: 0;
+  line-height: 0;
+  width: 1.85rem;
+  height: 1.85rem;
   min-width: 1.85rem;
   min-height: 1.85rem;
+  padding: 0;
 }
 
 .btn--icon-sm {
@@ -502,8 +505,15 @@ button {
   width: 1.45rem;
   height: 1.45rem;
   min-width: 1.45rem;
+  min-height: 1.45rem;
   padding: 0;
-  line-height: 1;
+  line-height: 0;
+}
+
+.btn__close-icon {
+  display: block;
+  flex: 0 0 auto;
+  margin: auto;
 }
 
 .btn--block {
@@ -1169,6 +1179,109 @@ body:has(.update-banner) .toast-host {
   opacity: 0.7;
 }
 
+/* First-run tips above the outline (before the first bullet) */
+.editor-empty-hints {
+  position: relative;
+  max-width: 40rem;
+  margin: 0 0 1.35rem;
+  padding-left: var(--outline-gutter);
+  color: var(--ink-muted);
+}
+
+.editor-empty-hints__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.65rem;
+}
+
+.editor-empty-hints__lead {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--ink-muted) 75%, transparent);
+}
+
+.editor-empty-hints__close {
+  flex: 0 0 auto;
+  color: color-mix(in srgb, var(--ink-muted) 80%, transparent);
+}
+
+.editor-empty-hints__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  counter-reset: empty-hint;
+}
+
+.editor-empty-hints__item {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: baseline;
+  gap: 0.35rem 0.5rem;
+  font-size: 0.92rem;
+  line-height: 1.4;
+  color: color-mix(in srgb, var(--ink-muted) 92%, var(--ink));
+  counter-increment: empty-hint;
+}
+
+.editor-empty-hints__item::before {
+  content: counter(empty-hint);
+  flex: 0 0 1.25rem;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: color-mix(in srgb, var(--ink-muted) 70%, transparent);
+  text-align: right;
+}
+
+.editor-empty-hints__keys {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.2rem;
+  flex-shrink: 0;
+}
+
+.editor-empty-hints__keys kbd {
+  display: inline-block;
+  padding: 0.08rem 0.32rem;
+  border: 1px solid color-mix(in srgb, var(--line) 85%, transparent);
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--paper-deep) 55%, transparent);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  line-height: 1.2;
+  color: color-mix(in srgb, var(--ink-muted) 90%, var(--ink));
+}
+
+.editor-empty-hints__text {
+  min-width: 0;
+}
+
+.editor-empty-hints__privacy {
+  margin: 1rem 0 0;
+  max-width: 36rem;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: color-mix(in srgb, var(--ink-muted) 78%, transparent);
+}
+
+.editor-empty-hints__privacy code {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  padding: 0.05rem 0.25rem;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--paper-deep) 60%, transparent);
+}
+
 .editor-text-bold {
   font-weight: 700;
 }
@@ -1733,8 +1846,15 @@ body:has(.update-banner) .toast-host {
   cursor: pointer;
 }
 
+.outline-meta-popover__add-type-option--active,
 .outline-meta-popover__add-type-option:hover {
   background: color-mix(in srgb, var(--accent-soft) 75%, transparent);
+}
+
+.outline-meta-popover__add-type-btn:focus-visible {
+  outline: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+  color: var(--ink);
 }
 
 .outline-meta-popover__label {
@@ -1759,16 +1879,22 @@ body:has(.update-banner) .toast-host {
 
 .outline-meta-popover__field-clear {
   appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   flex: 0 0 auto;
   align-self: center;
+  box-sizing: border-box;
+  width: 1.45rem;
+  height: 1.45rem;
   margin: 0;
-  padding: 0.15rem 0.3rem;
+  padding: 0;
   border: 0;
   border-radius: 3px;
   background: transparent;
   color: var(--ink-muted);
-  font-size: 0.95rem;
-  line-height: 1;
+  font-size: 0;
+  line-height: 0;
   cursor: pointer;
 }
 
@@ -1839,13 +1965,20 @@ body:has(.update-banner) .toast-host {
 
 .outline-meta-popover__ms-chip-remove {
   appearance: none;
-  border: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 1rem;
+  height: 1rem;
   margin: 0;
-  padding: 0 0.15rem;
+  padding: 0;
+  border: 0;
+  border-radius: 2px;
   background: transparent;
   color: var(--ink-muted);
-  font-size: 0.85rem;
-  line-height: 1;
+  font-size: 0;
+  line-height: 0;
   cursor: pointer;
 }
 
@@ -3032,16 +3165,13 @@ button.debug-tree__file-link:hover {
 }
 
 select.settings-field__control {
-  background-image: linear-gradient(45deg, transparent 50%, var(--ink-muted) 50%),
-    linear-gradient(135deg, var(--ink-muted) 50%, transparent 50%);
-  background-position:
-    calc(100% - 14px) calc(50% - 3px),
-    calc(100% - 9px) calc(50% - 3px);
-  background-size:
-    5px 5px,
-    5px 5px;
+  background-color: var(--paper-deep);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1.5 1.75L6 6.25L10.5 1.75' fill='none' stroke='%23888888' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
-  padding-right: 1.6rem;
+  background-position: right 0.55rem center;
+  background-size: 0.65rem;
+  padding-right: 1.75rem;
+  line-height: 1.2;
 }
 
 /* —— Font / theme pickers (full-panel exploration grids) —— */
@@ -3626,6 +3756,7 @@ select.settings-field__control {
 .tasks-dialog__select {
   appearance: none;
   flex: 0 0 auto;
+  box-sizing: border-box;
   margin: 0;
   min-height: 1.85rem;
   padding: 0.28rem 1.55rem 0.28rem 0.5rem;
@@ -3639,6 +3770,9 @@ select.settings-field__control {
   color: var(--ink);
   font-family: var(--font-display);
   font-size: 0.78rem;
+  letter-spacing: 0;
+  line-height: 1.2;
+  vertical-align: middle;
   cursor: pointer;
 }
 
@@ -3956,15 +4090,30 @@ select.settings-field__control {
 }
 
 .tasks-table__status-select {
+  appearance: none;
+  box-sizing: border-box;
   max-width: 8.5rem;
+  min-height: 1.65rem;
   margin: 0;
-  padding: 0.15rem 0.35rem;
+  padding: 0.2rem 1.35rem 0.2rem 0.4rem;
   border: 1px solid color-mix(in srgb, var(--status-color, var(--line)) 50%, var(--line));
   border-radius: 3px;
-  background: color-mix(in srgb, var(--status-color, var(--accent)) 12%, var(--paper));
+  background-color: color-mix(
+    in srgb,
+    var(--status-color, var(--accent)) 12%,
+    var(--paper)
+  );
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1.5 1.75L6 6.25L10.5 1.75' fill='none' stroke='%23888888' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.35rem center;
+  background-size: 0.55rem;
   color: var(--ink);
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+  font-weight: 400;
+  letter-spacing: 0;
+  line-height: 1.2;
+  vertical-align: middle;
   cursor: pointer;
 }
 

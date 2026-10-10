@@ -122,7 +122,8 @@ export function createEntityMultiselect(
         remove.type = 'button';
         remove.className = `${prefix}__ms-chip-remove`;
         remove.setAttribute('aria-label', `Remove ${entity.label}`);
-        remove.textContent = '×';
+        remove.innerHTML =
+          '<svg class="btn__close-icon" width="10" height="10" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 7l10 10M17 7L7 17" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round"/></svg>';
         remove.addEventListener('pointerdown', (e) => {
           e.preventDefault();
           e.stopPropagation();

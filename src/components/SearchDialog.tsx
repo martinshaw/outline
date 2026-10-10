@@ -10,6 +10,7 @@ import {
 } from 'react';
 import type { NotesSearchIndex, SearchHit } from '../search/notesIndex';
 import { formatDayLabel } from '../utils/date';
+import { CloseIcon } from './CloseIcon';
 
 type Props = {
   open: boolean;
@@ -179,7 +180,7 @@ export function SearchDialog({
             aria-label="Close"
             onClick={onClose}
           >
-            ×
+            <CloseIcon size={14} />
           </button>
         </header>
 
@@ -212,7 +213,7 @@ export function SearchDialog({
         >
           {!trimmed && (
             <p className="search-dialog__empty">
-              Type to search across {stats.documents.toLocaleString()} block
+              Type to search across {stats.documents.toLocaleString()} item
               {stats.documents === 1 ? '' : 's'} in{' '}
               {stats.days.toLocaleString()} note
               {stats.days === 1 ? '' : 's'}
@@ -223,7 +224,7 @@ export function SearchDialog({
             <p className="search-dialog__empty">
               {building
                 ? 'Still indexing — try again in a moment.'
-                : 'No matching blocks.'}
+                : 'No matching items.'}
             </p>
           )}
           {results.map((hit, i) => (

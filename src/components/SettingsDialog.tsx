@@ -24,6 +24,7 @@ import {
   type StatusDef,
 } from '../settings/types';
 import { DEFAULT_ENTITY_TYPES } from '../entities/types';
+import { CloseIcon } from './CloseIcon';
 import { FontPicker, type FontPickerValue } from './FontPicker';
 import { ThemePicker } from './ThemePicker';
 
@@ -229,7 +230,7 @@ export function SettingsDialog({ open, onClose }: Props) {
             aria-label="Close"
             onClick={onClose}
           >
-            ×
+            <CloseIcon size={14} />
           </button>
         </header>
 
@@ -400,7 +401,7 @@ export function SettingsDialog({ open, onClose }: Props) {
                         aria-label={`Remove ${status.label}`}
                         onClick={() => removeStatus(index)}
                       >
-                        ×
+                        <CloseIcon size={12} />
                       </button>
                     </li>
                   ))}
@@ -461,7 +462,7 @@ export function SettingsDialog({ open, onClose }: Props) {
                         aria-label={`Remove ${typeDef.label}`}
                         onClick={() => removeEntityType(index)}
                       >
-                        ×
+                        <CloseIcon size={12} />
                       </button>
                     </li>
                   ))}
