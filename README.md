@@ -568,6 +568,7 @@ Selection export requires at least one block selected.
 | Command | Description |
 |---------|-------------|
 | `npm run dev` | Vite dev server |
+| `npm test` | Vitest suite (also runs in CI before Pages deploy) |
 | `npm run build` | Typecheck + production build (`base: /`) |
 | `npm run build:pages` | Typecheck + build for GitHub Pages (`base: /outline/`) |
 | `npm run preview` | Preview the production build locally |
@@ -576,7 +577,7 @@ Selection export requires at least one block selected.
 
 ## Deploy (GitHub Pages)
 
-CI builds and deploys on pushes to `main` / `master`, on version tags (`v*`), and via **workflow_dispatch**:
+CI installs dependencies, runs **`npm test`**, then builds and deploys on pushes to `main` / `master`, on version tags (`v*`), and via **workflow_dispatch**. Failed tests block the deploy.
 
 - Workflow: [`.github/workflows/deploy-pages.yml`](.github/workflows/deploy-pages.yml)
 - Site: https://martinshaw.github.io/outline/
