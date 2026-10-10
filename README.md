@@ -1,8 +1,10 @@
 # Outline
 
-**Version 1.3.1** · [Live demo](https://martinshaw.github.io/outline/) · [Repository](https://github.com/martinshaw/outline)
+**Version 1.3.2** · [Open Outline](https://martinshaw.github.io/outline/) · [Repository](https://github.com/martinshaw/outline)
 
-Local-first chronological outline editor inspired by [LogSeq](https://logseq.com). Notes live in a folder on your computer via Chrome’s File System Access API — no account, no server, no sync backend.
+Local-first chronological outline editor inspired by [LogSeq](https://logseq.com). Notes stay on disk via the File System Access API; no account, no server, no sync backend.
+
+The easiest way to use it is the [hosted app](https://martinshaw.github.io/outline/) — open it in Chrome, choose a notes folder on your computer, and work there. 
 
 Built with [React](https://react.dev), [Lexical](https://lexical.dev), [Vite](https://vitejs.dev), and a Progressive Web App shell for offline use.
 
@@ -86,19 +88,23 @@ Safari and Firefox are **not** supported for folder persistence. iOS can install
 
 ## Quick start
 
+**Use the app:** open **[outline on GitHub Pages](https://martinshaw.github.io/outline/)** in **desktop Chrome**.
+
+1. Click **Open notes folder**
+2. Choose an existing directory or create a new one
+3. Grant read/write permission when Chrome prompts — prefer **Allow on every visit** so you are not asked every reload
+4. Start typing in today’s outline
+
+The folder handle is remembered in IndexedDB. On later visits you may still need one click to re-grant permission if you did not allow every visit. Do not use Cursor’s integrated browser — see [Requirements](#requirements).
+
+### Develop locally
+
 ```bash
 npm install
 npm run dev
 ```
 
-Open the URL Vite prints in **desktop Chrome** (typically `http://localhost:5173`). Do not use Cursor’s integrated browser — see [Requirements](#requirements).
-
-1. On the setup screen, click **Open notes folder** (repo link is at the bottom of that screen)
-2. Choose an existing directory or create a new one
-3. Grant read/write permission when Chrome prompts — prefer **Allow on every visit** so you are not asked every reload
-4. Start typing in today’s outline
-
-The folder handle is remembered in IndexedDB. On later visits you may still need one click to re-grant permission if you did not allow every visit.
+Open the URL Vite prints in **desktop Chrome** (typically `http://localhost:5173`).
 
 ### Production build
 
@@ -582,7 +588,9 @@ CI installs dependencies, runs **`npm test`**, then builds and deploys on pushes
 Pushing a **`v*`** tag also creates a [GitHub Release](https://github.com/martinshaw/outline/releases) whose notes are taken from that version’s section in `CHANGELOG.md`.
 
 - Workflows: [`.github/workflows/deploy-pages.yml`](.github/workflows/deploy-pages.yml), [`.github/workflows/release.yml`](.github/workflows/release.yml)
-- Site: https://martinshaw.github.io/outline/
+- Hosted app (default instance): https://martinshaw.github.io/outline/
+
+That URL is the primary public build — the same app anyone should open to use Outline with their own folder. Building locally or self-hosting `dist/` is optional.
 
 Enable **Settings → Pages → GitHub Actions** as the source. The `github-pages` environment should allow the `master` (or `main`) branch and optionally `v*` tags.
 
