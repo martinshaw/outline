@@ -22,10 +22,53 @@ import {
   type DebugLogEntry,
   type SaveDebugState,
 } from '../storage/debugStore';
+import { showErrorToast } from './toastStore';
 import { notesClient } from '../storage/notesClient';
 import type { FsEntry } from '../storage/fs';
 import type { DayDocument, ItemKind, OutlineItem } from '../types';
 import { isDayEmpty, itemTitle } from '../utils/outline';
+
+/**
+ * Open a workspace file in a new tab.
+ * Prefer a host-provided absolute `File.path` as `file://` (Electron-style);
+ * otherwise fall back to a blob URL — browsers block `file://` from web origins
+ * and the File System Access API does not expose absolute paths.
+ */
+async function openWorkspaceFileInTab(path: string[]): Promise<void> {
+  const file = await notesClient.readWorkspaceFile(path);
+  if (!file) {
+    showErrorToast(`Could not open ${path.join('/') || '(file)'}`);
+    return;
+  }
+
+  const abs = (file as File & { path?: string }).path;
+  if (typeof abs === 'string' && abs.length > 0) {
+    let href: string;
+    if (/^[A-Za-z]:[\\/]/.test(abs)) {
+      href = `file:///${abs.replace(/\\/g, '/')}`;
+    } else if (abs.startsWith('/')) {
+      href = `file://${abs}`;
+    } else {
+      href = '';
+    }
+    if (href) {
+      const opened = window.open(href, '_blank', 'noopener,noreferrer');
+      if (opened) return;
+      // Popup blocked or file:// refused — fall through to blob.
+    }
+  }
+
+  const url = URL.createObjectURL(file);
+  const opened = window.open(url, '_blank', 'noopener,noreferrer');
+  if (!opened) {
+    const a = document.createElement('a');
+    a.href = url;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    a.click();
+  }
+  window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
 
 type Props = {
   activeDate: string;
@@ -279,6 +322,7 @@ function FileTreeBranch({
   loading,
   errors,
   onToggle,
+  onOpenFile,
 }: {
   path: string[];
   folderName: string;
@@ -287,6 +331,7 @@ function FileTreeBranch({
   loading: Set<string>;
   errors: Map<string, string>;
   onToggle: (path: string[]) => void;
+  onOpenFile: (path: string[]) => void;
 }) {
   const key = pathKey(path);
   const entries = cache.get(key);
@@ -344,6 +389,7 @@ function FileTreeBranch({
                 loading={loading}
                 errors={errors}
                 onToggle={onToggle}
+                onOpenFile={onOpenFile}
               />
             ) : (
               <div
@@ -357,9 +403,14 @@ function FileTreeBranch({
                   ·
                 </span>
                 <span className="debug-tree__kind">file</span>
-                <span className="debug-tree__label" title={entry.name}>
+                <button
+                  type="button"
+                  className="debug-tree__label debug-tree__file-link"
+                  title={`Open ${[...path, entry.name].join('/')}`}
+                  onClick={() => onOpenFile([...path, entry.name])}
+                >
                   {entry.name}
-                </span>
+                </button>
               </div>
             ),
           )}
@@ -431,6 +482,13 @@ function FilesPanel({ folderName }: { folderName: string }) {
     [cache, loadPath, loading],
   );
 
+  const onOpenFile = useCallback((filePath: string[]) => {
+    if (!isDebugEnabled()) return;
+    void openWorkspaceFileInTab(filePath).catch((e) => {
+      showErrorToast(e instanceof Error ? e.message : String(e));
+    });
+  }, []);
+
   if (!isDebugEnabled()) return null;
 
   return (
@@ -462,6 +520,7 @@ function FilesPanel({ folderName }: { folderName: string }) {
           loading={loading}
           errors={errors}
           onToggle={onToggle}
+          onOpenFile={onOpenFile}
         />
       </div>
     </section>

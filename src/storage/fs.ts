@@ -341,15 +341,37 @@ export type FsEntry = {
   kind: 'file' | 'directory';
 };
 
+function assertSafePathSegment(segment: string): void {
+  if (
+    !segment ||
+    segment === '.' ||
+    segment === '..' ||
+    segment.includes('/') ||
+    segment.includes('\\') ||
+    segment.includes('\0')
+  ) {
+    throw new Error(`Invalid path segment: ${segment}`);
+  }
+}
+
+async function resolveDirectory(
+  root: FileSystemDirectoryHandle,
+  path: string[],
+): Promise<FileSystemDirectoryHandle> {
+  let dir = root;
+  for (const segment of path) {
+    assertSafePathSegment(segment);
+    dir = await dir.getDirectoryHandle(segment);
+  }
+  return dir;
+}
+
 /** List immediate children of a directory under the workspace root. */
 export async function listDirectoryEntries(
   root: FileSystemDirectoryHandle,
   path: string[] = [],
 ): Promise<FsEntry[]> {
-  let dir = root;
-  for (const segment of path) {
-    dir = await dir.getDirectoryHandle(segment);
-  }
+  const dir = await resolveDirectory(root, path);
   const entries: FsEntry[] = [];
   for await (const handle of dir.values()) {
     entries.push({ name: handle.name, kind: handle.kind });
@@ -359,4 +381,17 @@ export async function listDirectoryEntries(
     return a.name.localeCompare(b.name);
   });
   return entries;
+}
+
+/** Read a file under the workspace root by relative path segments. */
+export async function readWorkspaceFile(
+  root: FileSystemDirectoryHandle,
+  path: string[],
+): Promise<File> {
+  if (path.length === 0) throw new Error('Missing file path');
+  const name = path[path.length - 1];
+  assertSafePathSegment(name);
+  const dir = await resolveDirectory(root, path.slice(0, -1));
+  const handle = await dir.getFileHandle(name);
+  return handle.getFile();
 }

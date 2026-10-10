@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
 import {
+  $createTextNode,
   $getRoot,
   $getSelection,
   $isRangeSelection,
@@ -175,6 +176,8 @@ export function BlockSelectionPlugin(): null {
     };
 
     const syncFromTextSelection = () => {
+      let nextBlockIds: string[] | null = null;
+
       editor.getEditorState().read(() => {
         const selection = $getSelection();
         if (!$isRangeSelection(selection) || selection.isCollapsed()) {
@@ -185,20 +188,27 @@ export function BlockSelectionPlugin(): null {
         const focusItem = $getOutlineItem(selection.focus.getNode());
         if (!anchorItem || !focusItem) return;
 
+        // Same row: keep a normal text selection (drag-to-select, formatting).
+        // Only promote to block selection when the range spans multiple items.
+        if (anchorItem === focusItem) {
+          lastTextSelKey = '';
+          return;
+        }
+
         // Skip identical selection points (Lexical fires many updates while dragging).
         const selKey = `${selection.anchor.key}:${selection.anchor.offset}:${selection.focus.key}:${selection.focus.offset}`;
         if (selKey === lastTextSelKey) return;
         lastTextSelKey = selKey;
 
         const ordered = $collectOutlineItemsDFS($getRoot());
-        setBlockSelectedIds(
-          $clampBlockSelectionRange(
-            ordered,
-            anchorItem.getId(),
-            focusItem.getId(),
-          ),
+        nextBlockIds = $clampBlockSelectionRange(
+          ordered,
+          anchorItem.getId(),
+          focusItem.getId(),
         );
       });
+
+      if (nextBlockIds) setBlockSelectedIds(nextBlockIds);
     };
 
     const scheduleTextSync = () => {
@@ -334,7 +344,47 @@ export function BlockSelectionPlugin(): null {
     const onKeyDown = (event: KeyboardEvent) => {
       if (!isTypingKey(event)) return;
       if (getBlockSelectedIds().size === 0) return;
-      clearBlockSelectedIds();
+
+      // Cmd+A leaves a multi-item text range — Lexical replaces it; just
+      // drop block chrome so we don't fight the caret.
+      let hasTextRange = false;
+      editor.getEditorState().read(() => {
+        const sel = $getSelection();
+        hasTextRange = $isRangeSelection(sel) && !sel.isCollapsed();
+      });
+      if (hasTextRange) {
+        clearBlockSelectedIds();
+        return;
+      }
+
+      // Block-only selection (gutter): replace / delete the selected rows.
+      event.preventDefault();
+      event.stopPropagation();
+      const key = event.key;
+      editor.update(() => {
+        const targets = $getTopLevelBlockSelection($getRoot());
+        clearBlockSelectedIds();
+        if (targets.length === 0) return;
+
+        const first = targets[0];
+        for (let i = 1; i < targets.length; i++) {
+          targets[i].remove();
+        }
+        for (const child of first.getChildren()) {
+          child.remove();
+        }
+
+        if (key === 'Backspace' || key === 'Delete' || key === 'Enter') {
+          first.append($createTextNode(''));
+          first.selectStart();
+          return;
+        }
+        if (key.length === 1) {
+          const text = $createTextNode(key);
+          first.append(text);
+          text.selectEnd();
+        }
+      });
     };
 
     const onMouseDown = (event: MouseEvent) => {

@@ -43,6 +43,12 @@ import {
   isDayEmpty,
   sidebarDaysEqual,
 } from './utils/outline';
+import { fireTaskCompleteConfetti } from './utils/confetti';
+import {
+  countSubtaskProgress,
+  didCompleteAllSubtasks,
+  findOwningTask,
+} from './utils/subtaskCompletion';
 import { setItemStatusInDocument } from './utils/taskIndex';
 
 type GateState =
@@ -259,6 +265,10 @@ export default function App() {
     const todayDoc = cache.get(today) ?? emptyDayDocument(today);
     setActiveDate(today);
     setActiveDoc(todayDoc);
+    setFocusItemId(null);
+    // Remount the editor even when the date is unchanged — otherwise
+    // LoadDocumentPlugin keeps the previous folder's Lexical state.
+    setEditorNonce((n) => n + 1);
     setGate({ status: 'ready', handle, folderName: handle.name });
     // Folder settings may reopen the sidebar; keep phones on the editor.
     if (
@@ -496,23 +506,75 @@ export default function App() {
   }, []);
   const onFocusHandled = useCallback(() => setFocusItemId(null), []);
 
-  const changeTaskStatus = useCallback(
-    async (date: string, itemId: string, status: string) => {
-      const doc = docsCacheRef.current.get(date);
-      if (!doc) return;
-      const next = setItemStatusInDocument(doc, itemId, status);
-      if (!next) return;
-      setDocsCache((prev) => new Map(prev).set(date, next));
-      setSidebar((prev) => mergeSidebar(next, prev));
-      syncSearchDay(next);
-      if (date === activeDateRef.current) {
-        setActiveDoc(next);
-        setEditorNonce((n) => n + 1);
+  const changeTaskStatuses = useCallback(
+    async (
+      updates: readonly { date: string; itemId: string; status: string }[],
+    ) => {
+      if (updates.length === 0) return;
+
+      const byDate = new Map<string, { itemId: string; status: string }[]>();
+      for (const u of updates) {
+        const list = byDate.get(u.date);
+        if (list) list.push({ itemId: u.itemId, status: u.status });
+        else byDate.set(u.date, [{ itemId: u.itemId, status: u.status }]);
       }
-      debugLog('info', 'tasks', 'status', `${itemId.slice(0, 8)} → ${status}`);
-      await handleSave(next);
+
+      const saves: Promise<void>[] = [];
+      let touchActive = false;
+      let celebrate = false;
+
+      for (const [date, dayUpdates] of byDate) {
+        let doc = docsCacheRef.current.get(date);
+        if (!doc) continue;
+        let next: DayDocument | null = doc;
+        for (const { itemId, status } of dayUpdates) {
+          const owning = findOwningTask(next.items, itemId);
+          const before = owning ? countSubtaskProgress(owning) : null;
+          const updated = setItemStatusInDocument(next, itemId, status);
+          if (updated) {
+            next = updated;
+            if (before && owning) {
+              const afterTask = findOwningTask(next.items, itemId);
+              if (
+                afterTask &&
+                didCompleteAllSubtasks(before, countSubtaskProgress(afterTask))
+              ) {
+                celebrate = true;
+              }
+            }
+          }
+        }
+        if (!next || next === doc) continue;
+
+        const saved = next;
+        setDocsCache((prev) => new Map(prev).set(date, saved));
+        setSidebar((prev) => mergeSidebar(saved, prev));
+        syncSearchDay(saved);
+        if (date === activeDateRef.current) {
+          setActiveDoc(saved);
+          touchActive = true;
+        }
+        debugLog(
+          'info',
+          'tasks',
+          'status',
+          `${dayUpdates.length} item(s) on ${date}`,
+        );
+        saves.push(handleSave(saved));
+      }
+
+      if (touchActive) setEditorNonce((n) => n + 1);
+      if (celebrate) window.setTimeout(() => fireTaskCompleteConfetti(), 0);
+      await Promise.all(saves);
     },
     [handleSave, mergeSidebar, syncSearchDay],
+  );
+
+  const changeTaskStatus = useCallback(
+    async (date: string, itemId: string, status: string) => {
+      await changeTaskStatuses([{ date, itemId, status }]);
+    },
+    [changeTaskStatuses],
   );
 
   // Prefer live sidebar; if empty, derive from cache once.
@@ -591,7 +653,7 @@ export default function App() {
             key={`${activeDate}-${editorNonce}`}
             date={activeDate}
             document={activeDoc}
-            enabled
+            enabled={!busy}
             focusItemId={focusItemId}
             onFocusHandled={onFocusHandled}
             onSave={handleSave}
@@ -641,6 +703,7 @@ export default function App() {
         docs={taskDocs}
         onSelectItem={selectItem}
         onChangeStatus={changeTaskStatus}
+        onChangeStatuses={changeTaskStatuses}
       />
       <SearchDialog
         open={searchOpen}

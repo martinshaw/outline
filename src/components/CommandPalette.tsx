@@ -12,12 +12,25 @@ import {
   subscribeSettings,
 } from '../settings/settingsStore';
 import type { DayDocument } from '../types';
+import {
+  FORMAT_TEXT_EVENT,
+  type FormatTextMode,
+} from '../editor/plugins/FormatCommandPlugin';
 import { OPEN_ITEM_META_EVENT } from '../editor/plugins/MetaAttributesPlugin';
+import { notesClient } from '../storage/notesClient';
 import {
   downloadExport,
   type ExportFormat,
   type ExportScope,
 } from '../utils/export';
+
+function runFormatText(mode: FormatTextMode): void {
+  queueMicrotask(() => {
+    window.dispatchEvent(
+      new CustomEvent(FORMAT_TEXT_EVENT, { detail: { mode } }),
+    );
+  });
+}
 
 type Props = {
   open: boolean;
@@ -130,13 +143,20 @@ export function CommandPalette({
 
   const runExport = useCallback(
     (scope: ExportScope, format: ExportFormat) => {
-      const result = downloadExport(activeDoc, scope, format);
-      if (!result.ok) {
-        onExportMessage?.(result.reason);
-        return;
-      }
-      onExportMessage?.(null);
-      onClose();
+      void (async () => {
+        const result = await downloadExport(
+          activeDoc,
+          scope,
+          format,
+          (path) => notesClient.readAttachment(path),
+        );
+        if (!result.ok) {
+          onExportMessage?.(result.reason);
+          return;
+        }
+        onExportMessage?.(null);
+        onClose();
+      })();
     },
     [activeDoc, onClose, onExportMessage],
   );
@@ -235,6 +255,59 @@ export function CommandPalette({
         run: () => {
           setSettings({ developerMode: !getSettings().developerMode });
           onClose();
+        },
+      },
+      {
+        id: 'format-bold',
+        group: 'Formatting',
+        label: 'Bold',
+        hint: `${mod}B`,
+        keywords: 'strong weight emphasis',
+        run: () => {
+          onClose();
+          runFormatText('bold');
+        },
+      },
+      {
+        id: 'format-italic',
+        group: 'Formatting',
+        label: 'Italic',
+        hint: `${mod}I`,
+        keywords: 'emphasis oblique',
+        run: () => {
+          onClose();
+          runFormatText('italic');
+        },
+      },
+      {
+        id: 'format-underline',
+        group: 'Formatting',
+        label: 'Underline',
+        hint: `${mod}U`,
+        keywords: 'underscore',
+        run: () => {
+          onClose();
+          runFormatText('underline');
+        },
+      },
+      {
+        id: 'format-clear',
+        group: 'Formatting',
+        label: 'Clear text formatting',
+        keywords: 'remove bold italic underline plain unstyled',
+        run: () => {
+          onClose();
+          runFormatText('clear');
+        },
+      },
+      {
+        id: 'format-remove-link',
+        group: 'Formatting',
+        label: 'Remove link',
+        keywords: 'unlink hyperlink url',
+        run: () => {
+          onClose();
+          runFormatText('remove-link');
         },
       },
     ];

@@ -12,6 +12,7 @@ import {
 } from '../../settings/settingsStore';
 import { isRoleKind } from '../../types';
 import type { OutlineItemNode } from '../nodes/OutlineItemNode';
+import { $setStatusMaybeCelebrate } from '../utils/celebrateSubtasks';
 import {
   $getMoveTargets,
   $getNearestTaskParent,
@@ -32,7 +33,7 @@ function $cycleStatusOrDemote(item: OutlineItemNode): void {
     item.setKind('note');
     return;
   }
-  item.setStatus(statuses[nextIdx].id);
+  $setStatusMaybeCelebrate(item, statuses[nextIdx].id);
 }
 
 function $promoteOrCycle(item: OutlineItemNode): void {

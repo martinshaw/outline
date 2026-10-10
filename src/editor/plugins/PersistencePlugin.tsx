@@ -44,7 +44,17 @@ export function PersistencePlugin({
   onChangeRef.current = onChange;
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled) {
+      // Cancel any pending flush so a folder switch cannot write the
+      // previous workspace's editor state into the new root.
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+      if (changeRaf.current != null) cancelAnimationFrame(changeRaf.current);
+      saveTimer.current = null;
+      changeRaf.current = null;
+      needsChangeFlush.current = false;
+      setPwaSaveBusy(false);
+      return;
+    }
 
     let coalescedUpdates = 0;
     let lastEditorLogAt = 0;

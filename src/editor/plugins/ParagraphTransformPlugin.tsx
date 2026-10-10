@@ -2,14 +2,20 @@ import { useEffect } from 'react';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
 import {
   $createTextNode,
-  $getRoot,
-  $isParagraphNode,
+  $isRootNode,
   ParagraphNode,
 } from 'lexical';
 import { createId } from '../../utils/id';
-import { $createOutlineItemNode, $isOutlineItemNode } from '../nodes/OutlineItemNode';
+import {
+  $createOutlineItemNode,
+  $isOutlineItemNode,
+} from '../nodes/OutlineItemNode';
 
-/** Convert any ParagraphNode into an OutlineItemNode so the doc stays a pure outline. */
+/**
+ * Convert ParagraphNodes into OutlineItemNodes so the doc stays a pure outline.
+ * Empty paragraphs are Lexical selection/split artifacts — drop them when the
+ * outline already has rows (otherwise Cmd+A / range edits leave orphan bullets).
+ */
 export function ParagraphTransformPlugin(): null {
   const [editor] = useLexicalComposerContext();
 
@@ -17,6 +23,26 @@ export function ParagraphTransformPlugin(): null {
     return editor.registerNodeTransform(ParagraphNode, (paragraph) => {
       const parent = paragraph.getParent();
       if (!parent) return;
+
+      const empty =
+        paragraph.getChildrenSize() === 0 ||
+        paragraph.getTextContent() === '';
+
+      if (empty) {
+        if ($isOutlineItemNode(parent)) {
+          paragraph.remove();
+          return;
+        }
+        if ($isRootNode(parent)) {
+          const hasOutlineSibling = parent
+            .getChildren()
+            .some((c) => c !== paragraph && $isOutlineItemNode(c));
+          if (hasOutlineSibling) {
+            paragraph.remove();
+            return;
+          }
+        }
+      }
 
       const item = $createOutlineItemNode(createId(), 'note');
       const children = paragraph.getChildren();
@@ -26,12 +52,6 @@ export function ParagraphTransformPlugin(): null {
         item.append(...children);
       }
       paragraph.replace(item);
-
-      // If somehow nested under another paragraph path left root with only non-outline, fix
-      const root = $getRoot();
-      if (root.getChildren().every((c) => !$isOutlineItemNode(c) && !$isParagraphNode(c))) {
-        // no-op
-      }
     });
   }, [editor]);
 

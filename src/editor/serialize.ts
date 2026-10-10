@@ -28,6 +28,7 @@ import {
   $isOutlineItemNode,
   OutlineItemNode,
 } from './nodes/OutlineItemNode';
+import { $repairDuplicateOutlineIds } from './utils/outlineHelpers';
 
 type TextFormat = { bold?: boolean; italic?: boolean; underline?: boolean };
 
@@ -189,4 +190,6 @@ export function $loadDayDocument(doc: DayDocument): void {
   for (const item of doc.items) {
     root.append(dataToOutlineItem(item));
   }
+  // Older pastes may have written duplicate ids to disk — uniquify on load.
+  $repairDuplicateOutlineIds();
 }

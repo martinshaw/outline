@@ -1,10 +1,17 @@
+import { zipSync } from 'fflate';
 import { resolveEntityLabels } from '../entities/entityStore';
 import { getBlockSelectedIds } from '../editor/blockSelectionStore';
+import {
+  ATTACHMENTS_DIR,
+  isSafeAttachmentPath,
+} from '../storage/attachments';
 import type { DayDocument, InlineSegment, OutlineItem } from '../types';
 import { segmentsToPlainText } from './outline';
 
 export type ExportFormat = 'json' | 'yaml' | 'markdown' | 'text' | 'html';
 export type ExportScope = 'day' | 'selection';
+
+export type AttachmentReader = (path: string) => Promise<Blob | null>;
 
 function escapeHtml(s: string): string {
   return s
@@ -37,6 +44,26 @@ export function itemsForExport(
 ): OutlineItem[] {
   if (scope === 'day') return doc.items;
   return extractSelectedItems(doc, getBlockSelectedIds());
+}
+
+/** Workspace-relative attachment paths referenced by the export tree. */
+export function collectAttachmentPaths(items: OutlineItem[]): string[] {
+  const paths = new Set<string>();
+  const walk = (list: OutlineItem[]) => {
+    for (const item of list) {
+      const path = item.attachment?.path;
+      if (
+        item.kind === 'attachment' &&
+        path &&
+        isSafeAttachmentPath(path)
+      ) {
+        paths.add(path);
+      }
+      walk(item.children);
+    }
+  };
+  walk(items);
+  return [...paths];
 }
 
 function segmentsToMarkdown(segments: InlineSegment[]): string {
@@ -75,7 +102,11 @@ function kindPrefix(item: OutlineItem): string {
     return `[${item.kind}${status}] `;
   }
   if (item.kind === 'attachment' && item.attachment) {
-    return `[file:${item.attachment.path}] `;
+    const { path, name, mime } = item.attachment;
+    if (mime.startsWith('image/')) {
+      return `![${name}](${path}) `;
+    }
+    return `[${name}](${path}) `;
   }
   return '';
 }
@@ -120,19 +151,34 @@ function toPlainText(items: OutlineItem[], depth = 0): string {
   const lines: string[] = [];
   for (const item of items) {
     const body = segmentsToPlainText(item.content);
+    const prefix =
+      item.kind === 'attachment' && item.attachment
+        ? `[file:${item.attachment.path}] `
+        : kindPrefix(item);
     lines.push(
-      `${pad}${kindPrefix(item)}${headingMarks(item)}${body}${metaSuffix(item)}`,
+      `${pad}${prefix}${headingMarks(item)}${body}${metaSuffix(item)}`,
     );
     if (item.children.length) lines.push(toPlainText(item.children, depth + 1));
   }
   return lines.join('\n');
 }
 
+function attachmentHtml(item: OutlineItem): string {
+  const att = item.attachment;
+  if (!att) return '';
+  const caption = segmentsToHtml(item.content);
+  if (att.mime.startsWith('image/')) {
+    const img = `<img src="${escapeHtml(att.path)}" alt="${escapeHtml(att.name)}"/>`;
+    return caption ? `${img} ${caption}` : img;
+  }
+  const link = `<a href="${escapeHtml(att.path)}">${escapeHtml(att.name)}</a>`;
+  return caption ? `${link} ${caption}` : link;
+}
+
 function toHtmlList(items: OutlineItem[]): string {
   if (items.length === 0) return '';
   const lis = items
     .map((item) => {
-      const body = segmentsToHtml(item.content) || '&nbsp;';
       const kind =
         item.kind !== 'note'
           ? ` data-kind="${escapeHtml(item.kind)}"`
@@ -142,10 +188,15 @@ function toHtmlList(items: OutlineItem[]): string {
           ? ` data-heading-level="${item.headingLevel}"`
           : '';
       const kids = toHtmlList(item.children);
-      const labeled =
-        item.kind === 'heading' && item.headingLevel
-          ? `<h${item.headingLevel}>${body}</h${item.headingLevel}>`
-          : body;
+      let labeled: string;
+      if (item.kind === 'attachment') {
+        labeled = attachmentHtml(item) || '&nbsp;';
+      } else if (item.kind === 'heading' && item.headingLevel) {
+        const body = segmentsToHtml(item.content) || '&nbsp;';
+        labeled = `<h${item.headingLevel}>${body}</h${item.headingLevel}>`;
+      } else {
+        labeled = segmentsToHtml(item.content) || '&nbsp;';
+      }
       return `<li${kind}${heading}>${labeled}${kids}</li>`;
     })
     .join('\n');
@@ -277,24 +328,96 @@ ${toHtmlList(items)}
   }
 }
 
-export function downloadExport(
-  doc: DayDocument,
-  scope: ExportScope,
-  format: ExportFormat,
-): { ok: true } | { ok: false; reason: string } {
-  const result = serializeExport(doc, scope, format);
-  if (!result) {
-    return { ok: false, reason: 'Nothing selected to export' };
-  }
-
-  const scopeLabel = scope === 'day' ? 'day' : 'selection';
-  const filename = `outline-${doc.date}-${scopeLabel}.${result.extension}`;
-  const blob = new Blob([result.content], { type: `${result.mime};charset=utf-8` });
+function triggerDownload(filename: string, blob: Blob): void {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
   a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+async function blobToUint8Array(blob: Blob): Promise<Uint8Array> {
+  return new Uint8Array(await blob.arrayBuffer());
+}
+
+/**
+ * Build the downloadable export. When the note tree references attachments,
+ * returns a zip: `{name}/notes.{ext}` plus `{name}/attachments/…`.
+ */
+export async function buildExportDownload(
+  doc: DayDocument,
+  scope: ExportScope,
+  format: ExportFormat,
+  readAttachment: AttachmentReader,
+): Promise<
+  | { ok: true; filename: string; blob: Blob; attachmentCount: number }
+  | { ok: false; reason: string }
+> {
+  const result = serializeExport(doc, scope, format);
+  if (!result) {
+    return { ok: false, reason: 'Nothing selected to export' };
+  }
+
+  const items = itemsForExport(doc, scope);
+  const paths = collectAttachmentPaths(items);
+  const scopeLabel = scope === 'day' ? 'day' : 'selection';
+  const baseName = `outline-${doc.date}-${scopeLabel}`;
+
+  if (paths.length === 0) {
+    return {
+      ok: true,
+      filename: `${baseName}.${result.extension}`,
+      blob: new Blob([result.content], {
+        type: `${result.mime};charset=utf-8`,
+      }),
+      attachmentCount: 0,
+    };
+  }
+
+  const files: Record<string, Uint8Array> = {
+    [`${baseName}/notes.${result.extension}`]: new TextEncoder().encode(
+      result.content,
+    ),
+  };
+
+  let attachmentCount = 0;
+  for (const path of paths) {
+    const blob = await readAttachment(path);
+    if (!blob) continue;
+    // Keep workspace-relative path under the export folder
+    // e.g. outline-…/attachments/uuid.png
+    const zipPath = `${baseName}/${path}`;
+    if (!zipPath.startsWith(`${baseName}/${ATTACHMENTS_DIR}/`)) continue;
+    files[zipPath] = await blobToUint8Array(blob);
+    attachmentCount += 1;
+  }
+
+  const zipped = zipSync(files, { level: 6 });
+  // Copy into a fresh ArrayBuffer-backed view — Blob rejects SharedArrayBuffer.
+  const bytes = new Uint8Array(zipped.byteLength);
+  bytes.set(zipped);
+  return {
+    ok: true,
+    filename: `${baseName}.zip`,
+    blob: new Blob([bytes], { type: 'application/zip' }),
+    attachmentCount,
+  };
+}
+
+export async function downloadExport(
+  doc: DayDocument,
+  scope: ExportScope,
+  format: ExportFormat,
+  readAttachment: AttachmentReader,
+): Promise<{ ok: true } | { ok: false; reason: string }> {
+  const built = await buildExportDownload(
+    doc,
+    scope,
+    format,
+    readAttachment,
+  );
+  if (!built.ok) return built;
+  triggerDownload(built.filename, built.blob);
   return { ok: true };
 }

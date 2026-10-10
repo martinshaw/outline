@@ -481,6 +481,8 @@ From the **command palette**, export the **whole day** or the **current block se
 | Text | `.txt` | Plain indented outline |
 | HTML | `.html` | Minimal standalone page |
 
+When the export includes attachments, the download is a **`.zip`** named like the note (`outline-YYYY-MM-DD-day.zip`) containing a folder with `notes.{ext}` and an `attachments/` directory of the referenced files. Paths in the note stay workspace-relative (`attachments/…`) so they resolve inside the unzipped folder. Exports without attachments stay a single file.
+
 Selection export requires at least one block selected.
 
 ---

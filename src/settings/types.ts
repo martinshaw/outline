@@ -14,7 +14,19 @@ export type FontId =
   | 'ibm-plex-mono'
   | 'jetbrains-mono';
 
-export type ThemeId = 'system' | 'light' | 'dark';
+export type ThemeId =
+  | 'system'
+  | 'light'
+  | 'dark'
+  | 'high-contrast'
+  | 'neon'
+  | 'miami-vice'
+  | 'nord'
+  | 'forest'
+  | 'sunset'
+  | 'terminal'
+  | 'ocean'
+  | 'espresso';
 
 export type BackupMode = 'on-next-day-write' | 'off';
 
@@ -65,6 +77,8 @@ export type AppSettings = {
    * Off by default (Safari Develop-menu style).
    */
   developerMode: boolean;
+  /** Confetti when every subtask under a task becomes done/archived. */
+  taskCompleteConfetti: boolean;
 };
 
 export const FONT_OPTIONS: {
@@ -109,10 +123,31 @@ export const FONT_OPTIONS: {
   },
 ];
 
-export const THEME_OPTIONS: { id: ThemeId; label: string }[] = [
-  { id: 'system', label: 'System' },
-  { id: 'light', label: 'Light' },
-  { id: 'dark', label: 'Dark' },
+export type ThemeGroup = 'core' | 'atmosphere';
+
+export const THEME_OPTIONS: {
+  id: ThemeId;
+  label: string;
+  description?: string;
+  group: ThemeGroup;
+}[] = [
+  {
+    id: 'system',
+    label: 'System',
+    description: 'Match device light/dark',
+    group: 'core',
+  },
+  { id: 'light', label: 'Light', group: 'core' },
+  { id: 'dark', label: 'Dark', group: 'core' },
+  { id: 'high-contrast', label: 'High contrast', group: 'core' },
+  { id: 'nord', label: 'Nord', group: 'atmosphere' },
+  { id: 'forest', label: 'Forest', group: 'atmosphere' },
+  { id: 'ocean', label: 'Ocean', group: 'atmosphere' },
+  { id: 'sunset', label: 'Sunset', group: 'atmosphere' },
+  { id: 'espresso', label: 'Espresso', group: 'atmosphere' },
+  { id: 'terminal', label: 'Terminal', group: 'atmosphere' },
+  { id: 'neon', label: 'Neon', group: 'atmosphere' },
+  { id: 'miami-vice', label: 'Miami Vice', group: 'atmosphere' },
 ];
 
 export const BACKUP_MODE_OPTIONS: {
@@ -153,4 +188,5 @@ export const DEFAULT_SETTINGS: AppSettings = {
   backupDirectory: 'backups',
   saveDebounceMs: 400,
   developerMode: false,
+  taskCompleteConfetti: true,
 };

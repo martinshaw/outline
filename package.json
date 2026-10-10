@@ -1,7 +1,7 @@
 {
   "name": "outline",
   "private": true,
-  "version": "1.1.1",
+  "version": "1.2.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -17,12 +17,15 @@
     "@lexical/rich-text": "^0.35.0",
     "@lexical/selection": "^0.35.0",
     "@lexical/utils": "^0.35.0",
+    "canvas-confetti": "^1.9.4",
+    "fflate": "^0.8.3",
     "idb-keyval": "^6.2.2",
     "lexical": "^0.35.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1"
   },
   "devDependencies": {
+    "@types/canvas-confetti": "^1.9.0",
     "@types/react": "^19.1.12",
     "@types/react-dom": "^19.1.9",
     "@vitejs/plugin-react": "^5.0.2",

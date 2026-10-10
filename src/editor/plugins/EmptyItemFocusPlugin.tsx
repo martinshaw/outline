@@ -1,13 +1,12 @@
 import { useEffect } from 'react';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
-import { $getRoot } from 'lexical';
 import {
   $isOutlineItemNode,
   type OutlineItemNode,
 } from '../nodes/OutlineItemNode';
 import {
-  $findOutlineItemById,
   $getContentChildren,
+  $outlineItemFromDOM,
 } from '../utils/outlineHelpers';
 
 function $selectEndOfItemContent(item: OutlineItemNode): void {
@@ -86,14 +85,11 @@ export function EmptyItemFocusPlugin(): null {
         if (tag !== 'BR') return;
       }
 
-      const outlineId = itemEl.getAttribute('data-outline-id');
-      if (!outlineId) return;
-
       const clickRightOfTitle = event.clientX > titleRowContentRight(itemEl);
 
       let isEmpty = false;
-      editor.getEditorState().read(() => {
-        const item = $findOutlineItemById($getRoot(), outlineId);
+      editor.read(() => {
+        const item = $outlineItemFromDOM(itemEl);
         if (!$isOutlineItemNode(item)) return;
         const content = $getContentChildren(item);
         isEmpty =
@@ -106,7 +102,8 @@ export function EmptyItemFocusPlugin(): null {
       event.preventDefault();
       editor.focus();
       editor.update(() => {
-        const item = $findOutlineItemById($getRoot(), outlineId);
+        // Resolve from the clicked DOM node — never by id (duplicates possible).
+        const item = $outlineItemFromDOM(itemEl);
         if (!$isOutlineItemNode(item)) return;
         if (clickRightOfTitle) $selectEndOfItemContent(item);
         else item.selectStart();

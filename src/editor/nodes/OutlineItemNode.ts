@@ -32,6 +32,7 @@ import {
   type HeadingLevel,
   type ItemKind,
 } from '../../types';
+import { createId } from '../../utils/id';
 import {
   formatMetaSubline,
   formatSubtaskProgress,
@@ -40,6 +41,7 @@ import {
   isIsoDate,
   normalizeEntities,
 } from '../../utils/itemMeta';
+import { shouldRemapOutlineIdsOnImport } from '../outlineIdRemap';
 
 export type SerializedOutlineItemNode = Spread<
   {
@@ -118,6 +120,12 @@ export class OutlineItemNode extends ElementNode {
 
   getId(): string {
     return this.__id;
+  }
+
+  setId(id: string): this {
+    const writable = this.getWritable();
+    writable.__id = id;
+    return writable;
   }
 
   getKind(): ItemKind {
@@ -289,7 +297,8 @@ export class OutlineItemNode extends ElementNode {
     }
   }
 
-  private countDescendantSubtasks(): { total: number; complete: number } {
+  /** Descendant subtasks under this task (stops at nested tasks). */
+  getSubtaskProgress(): { total: number; complete: number } {
     let total = 0;
     let complete = 0;
     const walk = (node: OutlineItemNode) => {
@@ -404,7 +413,7 @@ export class OutlineItemNode extends ElementNode {
     const progressLabel =
       this.__kind === 'task'
         ? (() => {
-            const { total, complete } = this.countDescendantSubtasks();
+            const { total, complete } = this.getSubtaskProgress();
             return formatSubtaskProgress(total, complete);
           })()
         : null;
@@ -648,8 +657,12 @@ export class OutlineItemNode extends ElementNode {
       kind?: string;
     };
     const schemaVersion = serialized.version === 2 ? 2 : 1;
+    // Fresh ids only while pasting (see outlineIdRemap). Preserve ids otherwise.
+    const id = shouldRemapOutlineIdsOnImport()
+      ? createId()
+      : serialized.id || createId();
     return $createOutlineItemNode(
-      serialized.id,
+      id,
       normalizeItemKind(legacy.kind ?? 'note', schemaVersion),
       serialized.status ?? null,
       serialized.headingLevel ?? null,
@@ -695,7 +708,8 @@ function kindLabelFor(
 }
 
 function convertOutlineElement(domNode: HTMLElement): DOMConversionOutput {
-  const id = domNode.getAttribute('data-outline-id') ?? crypto.randomUUID();
+  // Fresh id on HTML paste so duplicates are independent of the source row.
+  const id = createId();
   // DOM from current builds uses task/subtask; only map legacy `project`.
   const rawKind = domNode.getAttribute('data-kind') ?? 'note';
   const kind = normalizeItemKind(rawKind, rawKind === 'project' ? 1 : 2);
