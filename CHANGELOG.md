@@ -2,6 +2,10 @@
 
 Notes for each tagged release, drawn from merged pull-request summaries.
 
+## 1.3.2 — 2026-10-10
+
+- Position the GitHub Pages build as the default hosted app (not a “demo”); Quick start leads with that URL
+
 ## 1.3.1 — 2026-10-10
 
 - Bring README in line with 1.3.0: version badge, themes/fonts grids, get-started hints, confetti, tasks bulk select, search “items” wording, settings schema notes
