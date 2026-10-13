@@ -18,12 +18,17 @@ import {
   FONT_SIZE_MIN,
   FONT_SIZE_STEP,
   SAVE_DEBOUNCE_OPTIONS,
+  SCREENSAVER_IDLE_OPTIONS,
+  SCREENSAVER_MODE_OPTIONS,
   type AppSettings,
   type BackupMode,
   type EntityTypeDef,
+  type ScreensaverIdleMs,
+  type ScreensaverModeId,
   type StatusDef,
 } from '../settings/types';
 import { DEFAULT_ENTITY_TYPES } from '../entities/types';
+import { requestScreensaverPreview } from '../screensaver/preview';
 import { CloseIcon } from './CloseIcon';
 import { FontPicker, type FontPickerValue } from './FontPicker';
 import { ThemePicker } from './ThemePicker';
@@ -36,6 +41,7 @@ type Props = {
 type SettingsSectionId =
   | 'editor'
   | 'appearance'
+  | 'screensaver'
   | 'statuses'
   | 'entities'
   | 'backups'
@@ -45,6 +51,7 @@ type SettingsSectionId =
 const SECTIONS: { id: SettingsSectionId; label: string }[] = [
   { id: 'editor', label: 'Editor' },
   { id: 'appearance', label: 'Appearance' },
+  { id: 'screensaver', label: 'Screensaver' },
   { id: 'statuses', label: 'Statuses' },
   { id: 'entities', label: 'Entities' },
   { id: 'backups', label: 'Backups' },
@@ -70,6 +77,10 @@ export function SettingsDialog({ open, onClose }: Props) {
   const [localStatus, setLocalStatus] = useState<string | null>(null);
   const [localBusy, setLocalBusy] = useState(false);
   const [section, setSection] = useState<SettingsSectionId>('editor');
+  const [reducedMotion, setReducedMotion] = useState(() =>
+    typeof window !== 'undefined' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+  );
 
   const localFontsOk = supportsLocalFonts();
   const sectionLabel =
@@ -82,6 +93,13 @@ export function SettingsDialog({ open, onClose }: Props) {
       setLocal(next);
       setBackupDirDraft(next.backupDirectory);
     });
+  }, []);
+
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const onChange = () => setReducedMotion(mq.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
   }, []);
 
   useEffect(() => {
@@ -359,6 +377,111 @@ export function SettingsDialog({ open, onClose }: Props) {
                       }
                     />
                   </label>
+                </div>
+              </section>
+            )}
+
+            {section === 'screensaver' && (
+              <section
+                className="settings-section settings-section--screensaver"
+                aria-label="Screensaver"
+              >
+                <p className="settings-field__hint">
+                  After you stop typing, a WebGL dissolve of the open note
+                  plays until you move the mouse, press a key, or click.
+                  Ignored when{' '}
+                  <code>prefers-reduced-motion</code> is on.
+                </p>
+
+                <label className="settings-field settings-field--row">
+                  <span className="settings-field__label">Enable screensaver</span>
+                  <input
+                    type="checkbox"
+                    className="settings-field__checkbox"
+                    checked={settings.screensaverEnabled}
+                    onChange={(e) =>
+                      setSettings({ screensaverEnabled: e.target.checked })
+                    }
+                  />
+                </label>
+
+                <label className="settings-field">
+                  <span className="settings-field__label">Idle delay</span>
+                  <select
+                    className="settings-field__control"
+                    value={settings.screensaverIdleMs}
+                    disabled={!settings.screensaverEnabled}
+                    onChange={(e) =>
+                      setSettings({
+                        screensaverIdleMs: Number(
+                          e.target.value,
+                        ) as ScreensaverIdleMs,
+                      })
+                    }
+                  >
+                    {SCREENSAVER_IDLE_OPTIONS.map((opt) => (
+                      <option key={opt.ms} value={opt.ms}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <div className="screensaver-preview-row">
+                  <button
+                    type="button"
+                    className="btn btn--ghost"
+                    disabled={reducedMotion}
+                    title={
+                      reducedMotion
+                        ? 'Unavailable when prefers-reduced-motion is on'
+                        : 'Run the screensaver now using the selected mode'
+                    }
+                    onClick={() => requestScreensaverPreview()}
+                  >
+                    Preview
+                  </button>
+                  <span className="settings-field__hint screensaver-preview-row__hint">
+                    Captures the note behind this dialog. Close Settings before
+                    idle timing — move the mouse or press a key to exit preview.
+                  </span>
+                </div>
+
+                <div
+                  className="screensaver-mode-picker"
+                  role="listbox"
+                  aria-label="Screensaver mode"
+                  aria-disabled={!settings.screensaverEnabled}
+                >
+                  {SCREENSAVER_MODE_OPTIONS.map((opt) => {
+                    const on = settings.screensaverMode === opt.id;
+                    return (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        role="option"
+                        aria-selected={on}
+                        disabled={!settings.screensaverEnabled}
+                        className={
+                          on
+                            ? 'screensaver-mode-picker__item screensaver-mode-picker__item--on'
+                            : 'screensaver-mode-picker__item'
+                        }
+                        onClick={() =>
+                          setSettings({
+                            screensaverMode: opt.id as ScreensaverModeId,
+                          })
+                        }
+                      >
+                        <span className="screensaver-mode-picker__label">
+                          {opt.label}
+                        </span>
+                        <span className="screensaver-mode-picker__desc">
+                          {opt.description}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
               </section>
             )}

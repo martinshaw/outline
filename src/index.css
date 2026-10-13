@@ -3311,6 +3311,96 @@ select.settings-field__control {
   line-height: 1.2;
 }
 
+/* —— Idle WebGL screensaver —— */
+.screensaver-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 3500;
+  display: grid;
+  place-items: stretch;
+  background: var(--paper);
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  cursor: none;
+  pointer-events: auto;
+}
+
+.screensaver-overlay--in {
+  opacity: 1;
+}
+
+.screensaver-overlay__canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+.screensaver-mode-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-height: 0;
+  overflow: auto;
+}
+
+.screensaver-mode-picker__item {
+  appearance: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
+  margin: 0;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--paper) 92%, transparent);
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.screensaver-mode-picker__item:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--line));
+}
+
+.screensaver-mode-picker__item--on {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
+  background: color-mix(in srgb, var(--accent) 12%, var(--paper));
+}
+
+.screensaver-mode-picker__item:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.screensaver-mode-picker__label {
+  font-size: 0.86rem;
+  font-weight: 500;
+}
+
+.screensaver-mode-picker__desc {
+  font-size: 0.72rem;
+  color: var(--ink-muted);
+  line-height: 1.35;
+}
+
+.settings-section--screensaver {
+  gap: 0.75rem;
+}
+
+.screensaver-preview-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem 1rem;
+}
+
+.screensaver-preview-row__hint {
+  margin: 0;
+  flex: 1 1 12rem;
+}
+
 /* —— Font / theme pickers (full-panel exploration grids) —— */
 .settings-section--editor,
 .settings-section--appearance {

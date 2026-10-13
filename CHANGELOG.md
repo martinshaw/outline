@@ -2,6 +2,13 @@
 
 Notes for each tagged release, drawn from merged pull-request summaries.
 
+## 1.5.0 — 2026-10-13
+
+- Idle WebGL screensaver with Settings controls (enable, idle delay including 10–45s, mode picker, Preview)
+- Capture the open note for dissolve modes; Kaleido default with page-first visualizer effects (liquid, waveform, pulse, flame, and more)
+- Pure iTunes-style visualizer modes that ignore the note (bars, flower, stars, spiral, grid, and related `Viz *` effects)
+- Dismiss on mouse move, key, or click; respect `prefers-reduced-motion`
+
 ## 1.4.1 — 2026-10-13
 
 - Fix drag text selection when title flex rows shrink glyphs below their hit-target; keep Deadline/Entities beside the title
