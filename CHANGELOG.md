@@ -2,6 +2,12 @@
 
 Notes for each tagged release, drawn from merged pull-request summaries.
 
+## 1.3.4 — 2026-10-13
+
+- Drag-select from the empty space to the right of a line (seed caret at end, then extend on drag)
+- Single drag handle centered on a multi-item block selection
+- Preserve document order when dropping or moving a multi-item selection before a target
+
 ## 1.3.3 — 2026-10-13
 
 - Fix nested outline rows overflowing onto the task/subtask title line when indenting or outdenting (flex line-break + non-shrinking nest basis)

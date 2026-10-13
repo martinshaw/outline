@@ -1,15 +1,18 @@
 import { describe, expect, it, beforeEach } from 'vitest';
 import {
+  disposeBlockDragHandles,
   resetBlockSelectionStore,
   selfOnlyHighlightHeight,
   setBlockSelectedIds,
   setBlockSelfOnlyIds,
+  syncBlockDragHandles,
   syncBlockSelectionDom,
   syncSelfOnlyHighlightVar,
 } from './blockSelectionStore';
 
 beforeEach(() => {
   resetBlockSelectionStore();
+  disposeBlockDragHandles();
   document.body.innerHTML = '';
 });
 
@@ -26,6 +29,62 @@ function mountTree(): HTMLElement {
   `;
   document.body.appendChild(root);
   return root;
+}
+
+function mockRect(
+  el: Element,
+  rect: { top: number; left: number; height: number; width?: number },
+): void {
+  const width = rect.width ?? 100;
+  Object.defineProperty(el, 'getBoundingClientRect', {
+    configurable: true,
+    value: () => ({
+      top: rect.top,
+      bottom: rect.top + rect.height,
+      left: rect.left,
+      right: rect.left + width,
+      width,
+      height: rect.height,
+      x: rect.left,
+      y: rect.top,
+      toJSON: () => ({}),
+    }),
+  });
+}
+
+/** Editor shell + input with sibling selected rows (multi drag-root). */
+function mountSelectionShell(): { shell: HTMLElement; root: HTMLElement } {
+  const shell = document.createElement('div');
+  shell.className = 'editor-shell';
+  Object.defineProperty(shell, 'getBoundingClientRect', {
+    configurable: true,
+    value: () => ({
+      top: 0,
+      bottom: 400,
+      left: 0,
+      right: 400,
+      width: 400,
+      height: 400,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    }),
+  });
+  const root = document.createElement('div');
+  root.className = 'editor-input';
+  root.innerHTML = `
+    <div class="outline-item" data-outline-id="task">
+      task
+      <div class="outline-item" data-outline-id="a">A</div>
+      <div class="outline-item" data-outline-id="b">B
+        <div class="outline-item" data-outline-id="b1">B1</div>
+      </div>
+      <div class="outline-item" data-outline-id="c">C</div>
+    </div>
+  `;
+  shell.appendChild(root);
+  document.body.appendChild(shell);
+  return { shell, root };
 }
 
 describe('selfOnlyHighlightHeight', () => {
@@ -153,5 +212,62 @@ describe('syncSelfOnlyHighlightVar', () => {
     const el = document.createElement('div');
     syncSelfOnlyHighlightVar(el, true);
     expect(el.style.getPropertyValue('--outline-self-sel-h')).toBe('');
+  });
+});
+
+describe('syncBlockDragHandles', () => {
+  it('shows one handle centered on the union of multi drag-roots', () => {
+    const { shell, root } = mountSelectionShell();
+    const task = root.querySelector('[data-outline-id="task"]') as HTMLElement;
+    const a = root.querySelector('[data-outline-id="a"]') as HTMLElement;
+    const b = root.querySelector('[data-outline-id="b"]') as HTMLElement;
+    const b1 = root.querySelector('[data-outline-id="b1"]') as HTMLElement;
+    const c = root.querySelector('[data-outline-id="c"]') as HTMLElement;
+
+    mockRect(task, { top: 0, left: 20, height: 200 });
+    mockRect(a, { top: 40, left: 40, height: 20 });
+    mockRect(b, { top: 70, left: 40, height: 50 });
+    mockRect(b1, { top: 95, left: 60, height: 20 });
+    mockRect(c, { top: 130, left: 40, height: 20 });
+
+    setBlockSelectedIds(['a', 'b', 'b1', 'c']);
+    syncBlockSelectionDom(root);
+    syncBlockDragHandles(root);
+
+    const handles = shell.querySelectorAll('.outline-block-handle');
+    expect(handles).toHaveLength(1);
+    const handle = handles[0] as HTMLButtonElement;
+    // First drag-root in document order anchors the handle id.
+    expect(handle.dataset.outlineId).toBe('a');
+    // Union of a (40..60), b (70..120), c (130..150) → center at 95.
+    expect(handle.style.top).toBe('95px');
+    // Nested rows align to the root gutter (task.left + 2).
+    expect(handle.style.left).toBe('22px');
+  });
+
+  it('centers a single self-only handle on the parent content height', () => {
+    const { shell, root } = mountSelectionShell();
+    const task = root.querySelector('[data-outline-id="task"]') as HTMLElement;
+    const b = root.querySelector('[data-outline-id="b"]') as HTMLElement;
+    const b1 = root.querySelector('[data-outline-id="b1"]') as HTMLElement;
+
+    mockRect(task, { top: 0, left: 20, height: 200 });
+    mockRect(b, { top: 70, left: 40, height: 50 });
+    mockRect(b1, { top: 95, left: 60, height: 20 });
+
+    setBlockSelectedIds(['b']);
+    setBlockSelfOnlyIds(['b']);
+    syncBlockSelectionDom(root);
+    syncBlockDragHandles(root);
+
+    const handle = shell.querySelector(
+      '.outline-block-handle',
+    ) as HTMLButtonElement;
+    expect(handle).toBeTruthy();
+    // Self-only height is distance to first nested row: 95 - 70 = 25 → center 70+12.5.
+    expect(handle.style.top).toBe('83px');
+    expect(handle.classList.contains('outline-block-handle--self-only')).toBe(
+      true,
+    );
   });
 });
