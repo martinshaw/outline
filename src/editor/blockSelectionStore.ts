@@ -186,7 +186,9 @@ export function syncSelfOnlyHighlightVar(el: HTMLElement, on: boolean): void {
   );
 }
 
-const handleEls = new Map<string, HTMLButtonElement>();
+/** Single overlay handle for the whole block selection (not per drag-root). */
+const BLOCK_HANDLE_KEY = '__block__';
+let blockHandle: HTMLButtonElement | null = null;
 let handleLayer: HTMLElement | null = null;
 
 function ensureHandleLayer(shell: HTMLElement): HTMLElement {
@@ -223,9 +225,15 @@ function syncHandleLabel(handle: HTMLButtonElement, id: string): void {
   }
 }
 
+function clearBlockHandle(layer: HTMLElement): void {
+  layer.replaceChildren();
+  blockHandle = null;
+  layer.hidden = true;
+}
+
 /**
- * Position drag handles in an overlay outside contenteditable.
- * Cheap when nothing is selected; reuses handle elements across paints.
+ * Position one drag handle in an overlay outside contenteditable, vertically
+ * centered on the selected block (union of shallowest selected rows).
  */
 export function syncBlockDragHandles(root: HTMLElement | null): void {
   if (!root) return;
@@ -235,17 +243,20 @@ export function syncBlockDragHandles(root: HTMLElement | null): void {
   const layer = ensureHandleLayer(shell);
 
   if (selectedIds.size === 0) {
-    if (!layer.hidden) {
-      layer.replaceChildren();
-      handleEls.clear();
-      layer.hidden = true;
-    }
+    if (!layer.hidden) clearBlockHandle(layer);
+    return;
+  }
+
+  const roots = [
+    ...root.querySelectorAll('.outline-item--drag-root'),
+  ] as HTMLElement[];
+  if (roots.length === 0) {
+    if (!layer.hidden) clearBlockHandle(layer);
     return;
   }
 
   layer.hidden = false;
   const shellRect = shell.getBoundingClientRect();
-  const keep = new Set<string>();
 
   // Top-level rows share one gutter column — nested handles align to it.
   // Use viewport deltas only (shell is not the scroll container; .main is).
@@ -254,51 +265,69 @@ export function syncBlockDragHandles(root: HTMLElement | null): void {
     ? rootRow.getBoundingClientRect().left - shellRect.left + 2
     : null;
 
-  root.querySelectorAll('.outline-item--drag-root').forEach((node) => {
-    const el = node as HTMLElement;
-    const id = el.getAttribute('data-outline-id');
-    if (!id) return;
-    keep.add(id);
+  let unionTop = Infinity;
+  let unionBottom = -Infinity;
+  let left = Infinity;
+  let anchorId: string | null = null;
 
-    let handle = handleEls.get(id);
-    if (!handle || !handle.isConnected) {
-      handle = makeHandle(id);
-      handleEls.set(id, handle);
-      layer.appendChild(handle);
-    }
+  for (const el of roots) {
+    const id = el.getAttribute('data-outline-id');
+    if (!id) continue;
+    if (!anchorId) anchorId = id;
 
     const rect = el.getBoundingClientRect();
     // Self-only: anchor to parent content, not the full subtree box.
     const anchorH = selfOnlyIds.has(id)
       ? selfOnlyHighlightHeight(el)
       : rect.height;
-    const top = rect.top - shellRect.top + anchorH / 2;
+    unionTop = Math.min(unionTop, rect.top);
+    unionBottom = Math.max(unionBottom, rect.top + anchorH);
+
     const nested = Boolean(el.parentElement?.closest('.outline-item'));
-    let left = rect.left - shellRect.left + 2;
+    let rowLeft = rect.left - shellRect.left + 2;
     if (nested) {
       if (rootGutterLeft != null) {
-        left = rootGutterLeft;
+        rowLeft = rootGutterLeft;
       } else {
-        // Fallback: one nest step into the indent gutter.
         const nest =
           parseFloat(getComputedStyle(el).getPropertyValue('--outline-nest')) ||
           20;
-        left -= nest;
+        rowLeft -= nest;
       }
     }
-    // Avoid style thrash when position is unchanged (sub-pixel noise ignored).
-    const topPx = `${Math.round(top)}px`;
-    const leftPx = `${Math.round(left)}px`;
-    if (handle.style.top !== topPx) handle.style.top = topPx;
-    if (handle.style.left !== leftPx) handle.style.left = leftPx;
-    handle.classList.toggle('outline-block-handle--self-only', selfOnlyIds.has(id));
-    syncHandleLabel(handle, id);
-  });
+    // Prefer the leftmost gutter among roots (usually identical).
+    left = Math.min(left, rowLeft);
+  }
 
-  for (const [id, handle] of handleEls) {
-    if (keep.has(id)) continue;
-    handle.remove();
-    handleEls.delete(id);
+  if (!anchorId || !Number.isFinite(unionTop)) {
+    clearBlockHandle(layer);
+    return;
+  }
+
+  let handle = blockHandle;
+  if (!handle || !handle.isConnected) {
+    handle = makeHandle(anchorId);
+    handle.dataset.handleKey = BLOCK_HANDLE_KEY;
+    blockHandle = handle;
+    layer.replaceChildren(handle);
+  } else if (handle.dataset.outlineId !== anchorId) {
+    handle.dataset.outlineId = anchorId;
+  }
+
+  const top = (unionTop + unionBottom) / 2 - shellRect.top;
+  const topPx = `${Math.round(top)}px`;
+  const leftPx = `${Math.round(left)}px`;
+  if (handle.style.top !== topPx) handle.style.top = topPx;
+  if (handle.style.left !== leftPx) handle.style.left = leftPx;
+  handle.classList.toggle(
+    'outline-block-handle--self-only',
+    selfOnlyIds.has(anchorId),
+  );
+  syncHandleLabel(handle, anchorId);
+
+  // Drop any legacy per-row handles from older builds still in the layer.
+  for (const child of [...layer.children]) {
+    if (child !== handle) child.remove();
   }
 }
 
@@ -306,7 +335,7 @@ export function syncBlockDragHandles(root: HTMLElement | null): void {
 export function disposeBlockDragHandles(): void {
   handleLayer?.remove();
   handleLayer = null;
-  handleEls.clear();
+  blockHandle = null;
   paintedIds = new Set();
   paintedSelfOnlyIds = new Set();
 }

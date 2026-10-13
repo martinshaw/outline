@@ -479,9 +479,14 @@ export function $clampBlockSelectionRange(
   return ids.slice(Math.min(a, best), Math.max(a, best) + 1);
 }
 
+/**
+ * Insert `nodes` immediately before `ref`, preserving array order.
+ * Each insert targets the same `ref`, so iterating forward keeps A,B,C
+ * (reverse iteration would yield C,B,A).
+ */
 function $insertAllBefore(ref: OutlineItemNode, nodes: OutlineItemNode[]): void {
-  for (let i = nodes.length - 1; i >= 0; i--) {
-    ref.insertBefore(nodes[i]);
+  for (const node of nodes) {
+    ref.insertBefore(node);
   }
 }
 

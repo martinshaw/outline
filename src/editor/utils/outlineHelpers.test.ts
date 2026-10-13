@@ -327,6 +327,36 @@ describe('$relocateOutlineItems', () => {
     expect(ok).toBe(true);
     expect(readIds(editor)).toEqual(['c', 'd', 'a', 'b']);
   });
+
+  it('preserves order when dropping multiple roots before a target', () => {
+    const editor = setupEditor(
+      dayDoc([
+        item('a', 'A'),
+        item('b', 'B'),
+        item('c', 'Morning'),
+        item('d', 'Auth'),
+        item('e', 'E'),
+      ]),
+    );
+    selectBlocks('c', 'd');
+    const ok = withItems(editor, ['c', 'd', 'a'], ([c, d, a]) =>
+      $relocateOutlineItems([c, d], a, 'before'),
+    );
+    expect(ok).toBe(true);
+    expect(readIds(editor)).toEqual(['c', 'd', 'a', 'b', 'e']);
+  });
+
+  it('preserves order when moving multiple roots up before a sibling', () => {
+    const editor = setupEditor(
+      dayDoc([item('a', 'A'), item('b', 'B'), item('c', 'C'), item('d', 'D')]),
+    );
+    selectBlocks('c', 'd');
+    expect(
+      withItems(editor, ['c', 'd'], (t) => $moveOutlineItemsUp(t)),
+    ).toBe(true);
+    // c,d were after b; move up swaps the block before b → a, c, d, b
+    expect(readIds(editor)).toEqual(['a', 'c', 'd', 'b']);
+  });
 });
 
 describe('$indentOutlineItems / $outdentOutlineItems', () => {
