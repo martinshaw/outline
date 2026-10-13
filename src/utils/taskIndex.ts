@@ -4,6 +4,7 @@ import {
   resolveEntityLabels,
 } from '../entities/entityStore';
 import { getStatusDef } from '../settings/settingsStore';
+import type { StatusDef } from '../settings/types';
 import type { DayDocument, OutlineItem } from '../types';
 import { isRoleKind } from '../types';
 import {
@@ -255,6 +256,52 @@ export function sortTasks(tasks: IndexedTask[], sort: TaskSort): IndexedTask[] {
     return a.title.localeCompare(b.title, undefined, { sensitivity: 'base' });
   });
   return sorted;
+}
+
+export type StatusColumn = {
+  statusId: string;
+  label: string;
+  color: string;
+  tasks: IndexedTask[];
+};
+
+/** Resolve a task status id against an explicit status list (board columns). */
+export function resolveColumnStatusId(
+  statusId: string | null | undefined,
+  statuses: readonly StatusDef[],
+): string {
+  if (statuses.length === 0) return statusId ?? 'todo';
+  if (statusId && statuses.some((s) => s.id === statusId)) return statusId;
+  return statuses[0].id;
+}
+
+/**
+ * Bucket filtered tasks into one column per status. Within each column, order
+ * is date desc then title (same secondary as `sortTasks`).
+ * Unknown / null status lands in the first configured column.
+ */
+export function groupTasksByStatus(
+  tasks: IndexedTask[],
+  statuses: readonly StatusDef[],
+): StatusColumn[] {
+  const columns: StatusColumn[] = statuses.map((s) => ({
+    statusId: s.id,
+    label: s.label,
+    color: s.color,
+    tasks: [],
+  }));
+  if (columns.length === 0) return columns;
+
+  const byId = new Map(columns.map((c) => [c.statusId, c]));
+  const ordered = sortTasks(tasks, { key: 'date', dir: 'desc' });
+
+  for (const task of ordered) {
+    const columnId = resolveColumnStatusId(task.status, statuses);
+    const column = byId.get(columnId) ?? columns[0];
+    column.tasks.push(task);
+  }
+
+  return columns;
 }
 
 /** Immutable status update for one outline item id inside a day document. */

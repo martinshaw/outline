@@ -138,6 +138,7 @@ export function normalizeEntityTypes(raw: unknown): EntityTypeDef[] {
     if (id === 'people') id = 'person';
     if (id === 'companies') id = 'company';
     if (id === 'projects') id = 'project';
+    if (id === 'sprints') id = 'sprint';
     let unique = id;
     let n = 2;
     while (seen.has(unique)) {

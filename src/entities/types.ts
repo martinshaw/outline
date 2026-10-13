@@ -1,6 +1,6 @@
 /**
  * Workspace-wide enumerable objects that tasks/subtasks can reference.
- * Type ids are configured in settings (`entityTypes`); default person, company, project.
+ * Type ids are configured in settings (`entityTypes`); default person, company, project, sprint.
  */
 export type EntityTypeId = string;
 
@@ -25,6 +25,7 @@ export const DEFAULT_ENTITY_TYPES: EntityTypeDef[] = [
   { id: 'person', label: 'People' },
   { id: 'company', label: 'Company' },
   { id: 'project', label: 'Project' },
+  { id: 'sprint', label: 'Sprint' },
 ];
 
 export const DEFAULT_ENTITY_CATALOG: EntityCatalog = {

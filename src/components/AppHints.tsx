@@ -3,6 +3,7 @@ type Props = {
   onOpenShortcuts: () => void;
   onOpenSettings: () => void;
   onOpenTasks: () => void;
+  onOpenBoard: () => void;
   onOpenSearch: () => void;
 };
 
@@ -12,56 +13,85 @@ const isMac =
 const mod = isMac ? '⌘' : 'Ctrl';
 const alt = isMac ? '⌥' : 'Alt';
 
+type Hint = {
+  id: string;
+  kbd: string;
+  label: string;
+  title: string;
+  onClick: () => void;
+};
+
 /** Faint top-right shortcut reminders (also clickable), longest first. */
 export function AppHints({
   onOpenPalette,
   onOpenShortcuts,
   onOpenSettings,
   onOpenTasks,
+  onOpenBoard,
   onOpenSearch,
 }: Props) {
+  const hints: Hint[] = [
+    {
+      id: 'settings',
+      kbd: `${mod}${alt},`,
+      label: 'for settings',
+      title: `Settings (${mod}+${alt}+,)`,
+      onClick: onOpenSettings,
+    },
+    {
+      id: 'palette',
+      kbd: `${mod}P`,
+      label: 'for commands',
+      title: `Command palette (${mod}+P)`,
+      onClick: onOpenPalette,
+    },
+    {
+      id: 'search',
+      kbd: `${mod}${alt}F`,
+      label: 'for search',
+      title: `Search notes (${mod}+${alt}+F)`,
+      onClick: onOpenSearch,
+    },
+    {
+      id: 'tasks',
+      kbd: `${mod}${alt}T`,
+      label: 'for tasks',
+      title: `Manage tasks (${mod}+${alt}+T)`,
+      onClick: onOpenTasks,
+    },
+    {
+      id: 'board',
+      kbd: `${mod}${alt}B`,
+      label: 'for triage',
+      title: `Open triage (${mod}+${alt}+B)`,
+      onClick: onOpenBoard,
+    },
+    {
+      id: 'help',
+      kbd: `${mod}/`,
+      label: 'for help',
+      title: `Keyboard shortcuts (${mod}+/)`,
+      onClick: onOpenShortcuts,
+    },
+  ].sort(
+    (a, b) =>
+      `${b.kbd} ${b.label}`.length - `${a.kbd} ${a.label}`.length ||
+      a.id.localeCompare(b.id),
+  );
+
   return (
     <div className="app-hints" aria-label="Keyboard shortcuts">
-      <button
-        type="button"
-        className="app-hints__item"
-        onClick={onOpenSettings}
-        title={`Settings (${mod}+${alt}+,)`}
-      >
-        <kbd>{mod}{alt},</kbd> for settings
-      </button>
-      <button
-        type="button"
-        className="app-hints__item"
-        onClick={onOpenPalette}
-        title={`Command palette (${mod}+P)`}
-      >
-        <kbd>{mod}P</kbd> for commands
-      </button>
-      <button
-        type="button"
-        className="app-hints__item"
-        onClick={onOpenSearch}
-        title={`Search notes (${mod}+${alt}+F)`}
-      >
-        <kbd>{mod}{alt}F</kbd> for search
-      </button>
-      <button
-        type="button"
-        className="app-hints__item"
-        onClick={onOpenTasks}
-        title={`Manage tasks (${mod}+${alt}+T)`}
-      >
-        <kbd>{mod}{alt}T</kbd> for tasks
-      </button>
-      <button
-        type="button"
-        className="app-hints__item"
-        onClick={onOpenShortcuts}
-        title={`Keyboard shortcuts (${mod}+/)`}
-      >
-        <kbd>{mod}/</kbd> for help
-      </button>
+      {hints.map((hint) => (
+        <button
+          key={hint.id}
+          type="button"
+          className="app-hints__item"
+          onClick={hint.onClick}
+          title={hint.title}
+        >
+          <kbd>{hint.kbd}</kbd> {hint.label}
+        </button>
+      ))}
     </div>
   );
 }

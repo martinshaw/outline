@@ -109,6 +109,7 @@ const SECTIONS: Section[] = [
       { keys: [mod, 'P'], action: 'Command palette (settings, exports, folder…)' },
       { keys: [mod, alt, 'F'], action: 'Search all notes' },
       { keys: [mod, alt, 'T'], action: 'Manage tasks across notes' },
+      { keys: [mod, alt, 'B'], action: 'Open triage (Kanban)' },
       { keys: [mod, alt, ','], action: 'Open settings' },
       {
         keys: [mod, alt, 'A'],
