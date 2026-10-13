@@ -40,6 +40,45 @@ export function $getNestedItems(item: OutlineItemNode): OutlineItemNode[] {
   return item.getChildren().filter($isOutlineItemNode);
 }
 
+/**
+ * Title text/links must stay before nested outline rows. Contenteditable + flex
+ * chrome can strand content after children; pull it back so titles don't sit on
+ * the same visual line as nested bullets (and so adjacent text can merge cleanly).
+ */
+export function $normalizeOutlineItemChildOrder(item: OutlineItemNode): void {
+  const children = item.getChildren();
+  if (children.length < 2) return;
+
+  let firstNested: OutlineItemNode | null = null;
+  const stranded: LexicalNode[] = [];
+  for (const child of children) {
+    if ($isOutlineItemNode(child)) {
+      if (!firstNested) firstNested = child;
+      continue;
+    }
+    if (firstNested) stranded.push(child);
+  }
+  if (!firstNested || stranded.length === 0) return;
+
+  for (const node of stranded) {
+    node.remove();
+    firstNested.insertBefore(node);
+  }
+}
+
+/** Append inline content after existing title content (before nested rows). */
+export function $appendContentBeforeNested(
+  item: OutlineItemNode,
+  nodes: LexicalNode[],
+): void {
+  const nested = $getNestedItems(item);
+  const anchor = nested[0] ?? null;
+  for (const node of nodes) {
+    if (anchor) anchor.insertBefore(node);
+    else item.append(node);
+  }
+}
+
 export function $getParentOutlineItem(
   item: OutlineItemNode,
 ): OutlineItemNode | null {

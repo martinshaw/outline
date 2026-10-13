@@ -2,6 +2,12 @@
 
 Notes for each tagged release, drawn from merged pull-request summaries.
 
+## 1.3.3 — 2026-10-13
+
+- Fix nested outline rows overflowing onto the task/subtask title line when indenting or outdenting (flex line-break + non-shrinking nest basis)
+- Keep title text before nested children; backspace-merge inserts content before nested rows instead of after them
+- Phone bottom editor bar: indent / outdent, move, task↔subtask, and bold / italic / underline when the soft keyboard lacks modifiers
+
 ## 1.3.2 — 2026-10-10
 
 - Position the GitHub Pages build as the default hosted app (not a “demo”); Quick start leads with that URL

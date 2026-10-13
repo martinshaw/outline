@@ -2,8 +2,11 @@ import { useEffect } from 'react';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
 import {
   COMMAND_PRIORITY_CRITICAL,
+  COMMAND_PRIORITY_HIGH,
   INSERT_PARAGRAPH_COMMAND,
   KEY_ENTER_COMMAND,
+  createCommand,
+  type LexicalCommand,
 } from 'lexical';
 import { mergeRegister } from '@lexical/utils';
 import {
@@ -18,6 +21,11 @@ import {
   $getNearestTaskParent,
   $getSelectedOutlineItem,
 } from '../utils/outlineHelpers';
+
+/** Promote / cycle status / demote — same as ⌘/Ctrl+Enter. */
+export const TOGGLE_ROLE_COMMAND: LexicalCommand<void> = createCommand(
+  'TOGGLE_ROLE',
+);
 
 function $cycleStatusOrDemote(item: OutlineItemNode): void {
   const statuses = getSettings().statuses;
@@ -102,6 +110,17 @@ export function RolePlugin(): null {
     };
 
     return mergeRegister(
+      editor.registerCommand(
+        TOGGLE_ROLE_COMMAND,
+        () => {
+          let ok = false;
+          editor.update(() => {
+            ok = $toggleRole();
+          });
+          return ok;
+        },
+        COMMAND_PRIORITY_HIGH,
+      ),
       editor.registerCommand(
         KEY_ENTER_COMMAND,
         (event) => {

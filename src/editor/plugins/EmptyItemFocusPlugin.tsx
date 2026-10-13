@@ -39,6 +39,7 @@ function titleRowContentRight(itemEl: HTMLElement): number {
       child.classList.contains('outline-meta') ||
       child.classList.contains('outline-subtask-progress') ||
       child.classList.contains('outline-status-chip') ||
+      child.classList.contains('outline-flex-break') ||
       child.classList.contains('outline-item')
     ) {
       continue;

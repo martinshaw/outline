@@ -712,6 +712,111 @@ button {
   gap: 0.12rem;
 }
 
+/* Fixed outline controls for phones (soft keyboards lack Tab / ⌘). */
+.mobile-editor-bar {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .mobile-editor-bar {
+    display: block;
+    position: fixed;
+    left: 0;
+    right: 0;
+    z-index: 55;
+    padding: 0.35rem 0.4rem
+      max(0.35rem, env(safe-area-inset-bottom));
+    border-top: 1px solid var(--line);
+    background: color-mix(in srgb, var(--paper) 92%, transparent);
+    -webkit-backdrop-filter: blur(16px) saturate(1.15);
+    backdrop-filter: blur(16px) saturate(1.15);
+    box-shadow: 0 -6px 20px color-mix(in srgb, #000 12%, transparent);
+  }
+
+  .mobile-editor-bar__row {
+    display: flex;
+    align-items: stretch;
+    justify-content: space-between;
+    gap: 0.25rem;
+    max-width: 36rem;
+    margin: 0 auto;
+  }
+
+  .mobile-editor-bar__btn {
+    appearance: none;
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 2.55rem;
+    margin: 0;
+    padding: 0.35rem 0.15rem;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--paper) 88%, transparent);
+    color: var(--ink);
+    font-family: var(--font-mono);
+    font-size: 0.95rem;
+    font-weight: 500;
+    line-height: 1;
+    letter-spacing: 0;
+    text-transform: none;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+
+  .mobile-editor-bar__btn:active {
+    background: color-mix(in srgb, var(--accent-soft) 70%, var(--paper));
+  }
+
+  .mobile-editor-bar__btn--role {
+    flex: 1.35 1 0;
+    font-size: 0.72rem;
+    letter-spacing: 0.02em;
+    text-transform: lowercase;
+  }
+
+  .mobile-editor-bar__btn--format {
+    font-family: var(--font-display);
+    font-size: 1rem;
+  }
+
+  .mobile-editor-bar__btn--bold {
+    font-weight: 700;
+  }
+
+  .mobile-editor-bar__btn--italic {
+    font-style: italic;
+  }
+
+  .mobile-editor-bar__btn--underline {
+    text-decoration: underline;
+    text-underline-offset: 0.12em;
+  }
+
+  .mobile-editor-bar__btn--active {
+    background: color-mix(in srgb, var(--accent-soft) 82%, var(--paper));
+    border-color: color-mix(in srgb, var(--accent) 40%, var(--line));
+    color: var(--ink);
+  }
+
+  .app-hints {
+    display: none;
+  }
+
+  body:has(.mobile-editor-bar) .update-banner,
+  body:has(.mobile-editor-bar) .toast-host {
+    bottom: calc(
+      max(0.35rem, env(safe-area-inset-bottom)) + 3.6rem
+    );
+  }
+
+  body:has(.mobile-editor-bar):has(.update-banner) .toast-host {
+    bottom: calc(
+      max(0.35rem, env(safe-area-inset-bottom)) + 3.6rem + 4.25rem
+    );
+  }
+}
+
 .app-hints__item {
   appearance: none;
   margin: 0;
@@ -1436,8 +1541,11 @@ body:has(.update-banner) .toast-host {
 
 /*
  * Title row: chip · text · tagline · progress; nested rows full-width below.
- * Center on the title line only — nested children use basis 100% so they
- * wrap to their own flex line and can't pull the chip off-center.
+ * Meta trails nested nodes in the DOM (Lexical slot), so flex `order` pulls
+ * the tagline onto the title row. A zero-height `.outline-flex-break` (order 3)
+ * forces a new flex line before nested children — `flex: 1 1 100%` alone can
+ * shrink nested rows onto the title line inside contenteditable, which looks
+ * like indent “overflow” and can merge text across items.
  */
 .outline-item:has(> .outline-meta) {
   display: flex;
@@ -1452,7 +1560,7 @@ body:has(.update-banner) .toast-host {
   flex: 0 0 auto;
 }
 
-.outline-item:has(> .outline-meta) > :not(.outline-meta):not(.outline-subtask-progress):not(.outline-status-chip):not(.outline-item) {
+.outline-item:has(> .outline-meta) > :not(.outline-meta):not(.outline-subtask-progress):not(.outline-status-chip):not(.outline-item):not(.outline-flex-break) {
   order: 1;
   flex: 0 1 auto;
   min-width: 0;
@@ -1464,10 +1572,26 @@ body:has(.update-banner) .toast-host {
   flex: 0 0 auto;
 }
 
-.outline-item:has(> .outline-meta) > .outline-item {
+/* Forces the title row to end before nested outline rows. */
+.outline-item:has(> .outline-meta) > .outline-flex-break {
   order: 3;
-  flex: 1 1 100%;
+  flex: 0 0 100%;
   width: 100%;
+  height: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.outline-item:has(> .outline-meta) > .outline-item {
+  order: 4;
+  flex: 0 0 100%;
+  width: 100%;
+  min-width: 100%;
+  max-width: 100%;
   box-sizing: border-box;
   align-self: flex-start;
 }
@@ -1496,8 +1620,10 @@ body:has(.update-banner) .toast-host {
 
 .outline-item--attachment > .outline-item {
   order: 2;
-  flex: 1 1 100%;
+  flex: 0 0 100%;
   width: 100%;
+  min-width: 100%;
+  max-width: 100%;
   box-sizing: border-box;
 }
 
@@ -2314,7 +2440,8 @@ body:has(.update-banner) .toast-host {
   .main {
     padding: 0.85rem
       calc(max(0.9rem, env(safe-area-inset-right)) + var(--outline-label))
-      2.5rem max(0.9rem, env(safe-area-inset-left));
+      calc(4.75rem + env(safe-area-inset-bottom))
+      max(0.9rem, env(safe-area-inset-left));
   }
 
   .main__day {
