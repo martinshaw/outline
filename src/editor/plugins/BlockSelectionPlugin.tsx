@@ -49,6 +49,28 @@ function findDragHandle(target: EventTarget | null): HTMLElement | null {
   return target.closest('.outline-block-handle');
 }
 
+function caretInTextAtPoint(x: number, y: number, root: HTMLElement): boolean {
+  const doc = document as Document & {
+    caretRangeFromPoint?: (x: number, y: number) => Range | null;
+    caretPositionFromPoint?: (
+      x: number,
+      y: number,
+    ) => { offsetNode: Node; offset: number } | null;
+  };
+  let node: Node | null = null;
+  if (typeof doc.caretRangeFromPoint === 'function') {
+    node = doc.caretRangeFromPoint(x, y)?.startContainer ?? null;
+  } else if (typeof doc.caretPositionFromPoint === 'function') {
+    node = doc.caretPositionFromPoint(x, y)?.offsetNode ?? null;
+  }
+  if (!node || !root.contains(node)) return false;
+  if (node.nodeType === Node.TEXT_NODE) return true;
+  return (
+    node instanceof Element &&
+    !!node.closest('[data-lexical-text="true"]')
+  );
+}
+
 function isGutterClick(event: MouseEvent, dom: HTMLElement): boolean {
   if (!(event.target instanceof Element)) return false;
   if (
@@ -67,6 +89,11 @@ function isGutterClick(event: MouseEvent, dom: HTMLElement): boolean {
   // selection at the start of the line). Padding / bullet hits `dom` itself
   // because label/bullet are CSS pseudos.
   if (event.target !== dom && event.target.tagName !== 'BR') {
+    return false;
+  }
+  // Flex-shrunk title spans can miss hit-tests; trust the caret when it
+  // resolves into text even though the event target is the row.
+  if (caretInTextAtPoint(event.clientX, event.clientY, dom)) {
     return false;
   }
   const rect = dom.getBoundingClientRect();

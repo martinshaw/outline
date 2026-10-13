@@ -1562,8 +1562,10 @@ body:has(.update-banner) .toast-host {
 
 .outline-item:has(> .outline-meta) > :not(.outline-meta):not(.outline-subtask-progress):not(.outline-status-chip):not(.outline-item):not(.outline-flex-break) {
   order: 1;
-  flex: 0 1 auto;
-  min-width: 0;
+  /* Content-sized only: no grow (keeps Deadline/Entities after the title)
+     and no shrink below glyphs (keeps drag-select hit-targets aligned). */
+  flex: 0 0 auto;
+  min-width: min-content;
 }
 
 .outline-item:has(> .outline-meta) > .outline-meta,

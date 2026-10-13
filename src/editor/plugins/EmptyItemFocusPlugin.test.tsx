@@ -103,6 +103,74 @@ describe('EmptyItemFocusPlugin', () => {
     expect(selection!.anchorOffset).toBe('Hello world'.length);
   });
 
+  it('does not steal mousedown when a text caret is under the pointer', async () => {
+    const doc = dayDoc([item('a', 'Hello world')]);
+
+    await act(async () => {
+      root.render(<Host doc={doc} />);
+    });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+
+    const itemEl = container.querySelector('.outline-item') as HTMLElement;
+    const textSpan = itemEl.querySelector(
+      '[data-lexical-text="true"]',
+    ) as HTMLElement;
+    const textNode = textSpan.firstChild as Text;
+
+    // Simulate flex-shrunk span: row click target, but caret still in text.
+    vi.spyOn(itemEl, 'getBoundingClientRect').mockReturnValue({
+      x: 0,
+      y: 0,
+      top: 0,
+      left: 0,
+      bottom: 24,
+      right: 400,
+      width: 400,
+      height: 24,
+      toJSON: () => ({}),
+    });
+    vi.spyOn(textSpan, 'getBoundingClientRect').mockReturnValue({
+      x: 40,
+      y: 0,
+      top: 0,
+      left: 40,
+      bottom: 24,
+      right: 80,
+      width: 40,
+      height: 24,
+      toJSON: () => ({}),
+    });
+
+    const mid = document.createRange();
+    mid.setStart(textNode, 3);
+    mid.collapse(true);
+    Object.defineProperty(document, 'caretRangeFromPoint', {
+      configurable: true,
+      writable: true,
+      value: () => mid,
+    });
+
+    let prevented = false;
+    await act(async () => {
+      const event = new MouseEvent('mousedown', {
+        bubbles: true,
+        cancelable: true,
+        button: 0,
+        clientX: 100,
+        clientY: 12,
+      });
+      event.preventDefault = () => {
+        prevented = true;
+        MouseEvent.prototype.preventDefault.call(event);
+      };
+      itemEl.dispatchEvent(event);
+    });
+
+    expect(prevented).toBe(false);
+  });
+
   it('extends selection when dragging from trailing empty space into text', async () => {
     const doc = dayDoc([item('a', 'Hello world')]);
 
@@ -146,10 +214,11 @@ describe('EmptyItemFocusPlugin', () => {
     const mid = document.createRange();
     mid.setStart(textNode, 5);
     mid.collapse(true);
+    // Trailing empty space has no text caret; only the drag move hits text.
     Object.defineProperty(document, 'caretRangeFromPoint', {
       configurable: true,
       writable: true,
-      value: () => mid,
+      value: (x: number, _y: number) => (x < 200 ? mid : null),
     });
 
     await act(async () => {
