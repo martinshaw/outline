@@ -53,6 +53,7 @@ import {
   findOwningTask,
 } from './utils/subtaskCompletion';
 import { setItemStatusInDocument } from './utils/taskIndex';
+import { IdleScreensaver } from './screensaver/IdleScreensaver';
 
 const CommandPalette = lazy(async () => {
   const m = await import('./components/CommandPalette');
@@ -767,6 +768,16 @@ export default function App() {
           />
         </main>
       </div>
+      <IdleScreensaver
+        blocked={
+          paletteOpen ||
+          settingsOpen ||
+          shortcutsOpen ||
+          tasksOpen ||
+          boardOpen ||
+          searchOpen
+        }
+      />
       <Suspense fallback={null}>
         {developerMode && (
           <DebugOverlay

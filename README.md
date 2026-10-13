@@ -1,6 +1,6 @@
 # Outline
 
-**Version 1.4.1** · [Open Outline](https://martinshaw.github.io/outline/) · [Repository](https://github.com/martinshaw/outline)
+**Version 1.5.0** · [Open Outline](https://martinshaw.github.io/outline/) · [Repository](https://github.com/martinshaw/outline)
 
 Local-first chronological outline editor inspired by [LogSeq](https://logseq.com). Notes stay on disk via the File System Access API; no account, no server, no sync backend.
 
@@ -69,6 +69,7 @@ Built with [React](https://react.dev), [Lexical](https://lexical.dev), [Vite](ht
 | **Themes** | System / Light / Dark / High contrast plus Nord, Forest, Ocean, Sunset, Espresso, Terminal, Neon, Miami Vice |
 | **Fonts** | Built-in + searchable system fonts (Local Font Access); exploration grid in Settings |
 | **Confetti** | Optional celebration when every subtask under a task is done/archived |
+| **Screensaver** | Idle WebGL dissolve of the open note (modes + delay in Settings) |
 | **Offline PWA** | Installable app shell; works offline after first visit; data stays on disk |
 | **Phone-friendly** | Drawer navigation, bottom editor bar (indent / move / task / format), safe areas; install from Chrome on Android |
 
@@ -272,6 +273,7 @@ Open **Settings** with **`⌘⌥,` / `Ctrl+Alt+,`** or from the command palette.
 | **Appearance → Theme** | Exploration grid: System, Light, Dark, High contrast, Nord, Forest, Ocean, Sunset, Espresso, Terminal, Neon, Miami Vice |
 | **Appearance → Collapse sidebar** | Also toggled from the command palette |
 | **Appearance → Confetti** | Celebrate when every subtask under a task becomes done/archived (on by default) |
+| **Screensaver** | Enable, idle delay, dissolve mode (Random + dissolve & visualizer modes), **Preview** |
 | **Statuses** | Labels and colours for task/subtask chips; add / remove / reset list |
 | **Entities** | Types for attribute multiselects (default People, Company, Project, Sprint); catalog in `entities.json` |
 | **Backups → When to backup** | On next day’s first write (default), or Off |
@@ -492,7 +494,10 @@ Enumerable objects shared across the workspace. Types are configured in Settings
   "backupDirectory": "backups",
   "saveDebounceMs": 400,
   "developerMode": false,
-  "taskCompleteConfetti": true
+  "taskCompleteConfetti": true,
+  "screensaverEnabled": true,
+  "screensaverMode": "kaleido",
+  "screensaverIdleMs": 90000
 }
 ```
 

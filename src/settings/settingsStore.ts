@@ -11,6 +11,8 @@ import {
   FONT_SIZE_MIN,
   FONT_SIZE_STEP,
   THEME_OPTIONS,
+  isScreensaverIdleMs,
+  isScreensaverModeId,
   type AppSettings,
   type BackupMode,
   type EntityTypeDef,
@@ -208,6 +210,18 @@ export function normalizeSettings(
   }
   if (typeof partial.taskCompleteConfetti === 'boolean') {
     base.taskCompleteConfetti = partial.taskCompleteConfetti;
+  }
+  if (typeof partial.screensaverEnabled === 'boolean') {
+    base.screensaverEnabled = partial.screensaverEnabled;
+  }
+  if (isScreensaverModeId(partial.screensaverMode)) {
+    base.screensaverMode = partial.screensaverMode;
+  }
+  const idleCandidate = partial.screensaverIdleMs;
+  if (isScreensaverIdleMs(idleCandidate)) {
+    base.screensaverIdleMs = Number(
+      idleCandidate,
+    ) as AppSettings['screensaverIdleMs'];
   }
   return base;
 }

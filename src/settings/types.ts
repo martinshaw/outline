@@ -2,8 +2,25 @@ import {
   DEFAULT_ENTITY_TYPES,
   type EntityTypeDef,
 } from '../entities/types';
+import type {
+  ScreensaverIdleMs,
+  ScreensaverModeId,
+} from '../screensaver/types';
 
 export type { EntityTypeDef } from '../entities/types';
+export type {
+  ScreensaverEffectId,
+  ScreensaverIdleMs,
+  ScreensaverModeId,
+} from '../screensaver/types';
+export {
+  SCREENSAVER_EFFECT_IDS,
+  SCREENSAVER_IDLE_OPTIONS,
+  SCREENSAVER_MODE_OPTIONS,
+  isScreensaverIdleMs,
+  isScreensaverModeId,
+  resolveScreensaverEffect,
+} from '../screensaver/types';
 
 export type FontId =
   | 'source-serif'
@@ -79,6 +96,10 @@ export type AppSettings = {
   developerMode: boolean;
   /** Confetti when every subtask under a task becomes done/archived. */
   taskCompleteConfetti: boolean;
+  /** Idle WebGL dissolve of the editor capture. */
+  screensaverEnabled: boolean;
+  screensaverMode: ScreensaverModeId;
+  screensaverIdleMs: ScreensaverIdleMs;
 };
 
 export const FONT_OPTIONS: {
@@ -189,4 +210,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   saveDebounceMs: 400,
   developerMode: false,
   taskCompleteConfetti: true,
+  screensaverEnabled: true,
+  screensaverMode: 'kaleido',
+  screensaverIdleMs: 90000,
 };
