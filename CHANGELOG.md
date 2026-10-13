@@ -2,6 +2,11 @@
 
 Notes for each tagged release, drawn from merged pull-request summaries.
 
+## 1.4.1 — 2026-10-13
+
+- Fix drag text selection when title flex rows shrink glyphs below their hit-target; keep Deadline/Entities beside the title
+- Ignore EmptyItemFocus / gutter clicks when a caret resolves into real text under the pointer
+
 ## 1.4.0 — 2026-10-13
 
 - Triage Kanban dialog (`⌘⌥B`): columns by status, drag cards to change status, jump to the item on open

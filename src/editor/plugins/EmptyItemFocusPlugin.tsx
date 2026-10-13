@@ -165,6 +165,25 @@ export function EmptyItemFocusPlugin(): null {
         if (tag !== 'BR') return;
       }
 
+      // Flex-shrunk title spans can be narrower than the painted glyphs, so a
+      // click on “text” still hits the row. If a caret resolves into a text
+      // node here, never steal the event — native drag-select must win.
+      const caretUnderPointer = caretRangeFromPoint(
+        event.clientX,
+        event.clientY,
+      );
+      if (
+        caretUnderPointer &&
+        itemEl.contains(caretUnderPointer.startContainer) &&
+        (caretUnderPointer.startContainer.nodeType === Node.TEXT_NODE ||
+          (caretUnderPointer.startContainer instanceof Element &&
+            caretUnderPointer.startContainer.closest(
+              '[data-lexical-text="true"]',
+            )))
+      ) {
+        return;
+      }
+
       const clickRightOfTitle = event.clientX > titleRowContentRight(itemEl);
 
       let isEmpty = false;
