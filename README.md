@@ -1,6 +1,6 @@
 # Outline
 
-**Version 1.3.2** · [Open Outline](https://martinshaw.github.io/outline/) · [Repository](https://github.com/martinshaw/outline)
+**Version 1.3.3** · [Open Outline](https://martinshaw.github.io/outline/) · [Repository](https://github.com/martinshaw/outline)
 
 Local-first chronological outline editor inspired by [LogSeq](https://logseq.com). Notes stay on disk via the File System Access API; no account, no server, no sync backend.
 
@@ -68,7 +68,7 @@ Built with [React](https://react.dev), [Lexical](https://lexical.dev), [Vite](ht
 | **Fonts** | Built-in + searchable system fonts (Local Font Access); exploration grid in Settings |
 | **Confetti** | Optional celebration when every subtask under a task is done/archived |
 | **Offline PWA** | Installable app shell; works offline after first visit; data stays on disk |
-| **Phone-friendly** | Drawer navigation, safe areas, touch targets; install from Chrome on Android |
+| **Phone-friendly** | Drawer navigation, bottom editor bar (indent / move / task / format), safe areas; install from Chrome on Android |
 
 ---
 
@@ -519,6 +519,7 @@ Selection export requires at least one block selected.
 ### Small screens
 
 - Notes list becomes a **slide-over drawer** (open via the command palette or Settings); choosing a day/item closes it.
+- A fixed **bottom bar** provides Tab / Shift+Tab, move up/down, task↔subtask (`⌘Enter`), and bold / italic / underline when the soft keyboard has no modifiers.
 - Editor gutters tighten so more of each line is visible.
 - Dialogs and the developer panel adapt to narrow viewports and home-indicator insets.
 

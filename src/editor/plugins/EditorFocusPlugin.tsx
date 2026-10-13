@@ -29,6 +29,7 @@ function isUiChromeTarget(target: EventTarget | null): boolean {
         '.sidebar',
         '.sidebar-backdrop',
         '.app-hints',
+        '.mobile-editor-bar',
         '.settings-overlay',
         '.shortcuts-overlay',
         '.command-palette-overlay',

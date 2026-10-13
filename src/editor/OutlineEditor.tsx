@@ -27,6 +27,7 @@ import { AttachmentImagePlugin } from './plugins/AttachmentImagePlugin';
 import { FormatCommandPlugin } from './plugins/FormatCommandPlugin';
 import { PasteOutlinePlugin } from './plugins/PasteOutlinePlugin';
 import { FocusFirstLinePlugin } from './plugins/FocusFirstLinePlugin';
+import { MobileEditorBarPlugin } from './plugins/MobileEditorBarPlugin';
 
 type Props = {
   date: string;
@@ -99,6 +100,7 @@ export const OutlineEditor = memo(function OutlineEditor({
         <BlockSelectionPlugin />
         <PasteOutlinePlugin />
         <FormatCommandPlugin />
+        <MobileEditorBarPlugin />
         <OutlineAutoLinkPlugin />
         <OutlineLinkPlugin />
         <PersistencePlugin

@@ -1,5 +1,6 @@
-import { $getRoot } from 'lexical';
+import { $createTextNode, $getRoot, $isTextNode } from 'lexical';
 import { describe, expect, it, beforeEach } from 'vitest';
+import { $isOutlineItemNode } from '../nodes/OutlineItemNode';
 import {
   dayDoc,
   item,
@@ -13,8 +14,10 @@ import {
   withItems,
 } from '../test/harness';
 import {
+  $appendContentBeforeNested,
   $clampBlockSelectionRange,
   $collectOutlineItemsDFS,
+  $getContentChildren,
   $getNestedItems,
   $getOutlineDepth,
   $getParentOutlineItem,
@@ -24,6 +27,7 @@ import {
   $isHierarchicallyValidBlockSelection,
   $moveOutlineItemsDown,
   $moveOutlineItemsUp,
+  $normalizeOutlineItemChildOrder,
   $outdentOutlineItems,
   $relocateOutlineItems,
   rangeIdsBetween,
@@ -480,5 +484,54 @@ describe('$moveOutlineItemsUp / $moveOutlineItemsDown', () => {
       withItems(editor, ['b', 'c'], (t) => $moveOutlineItemsDown(t)),
     ).toBe(true);
     expect(readIds(editor)).toEqual(['a', 'd', 'b', 'c']);
+  });
+});
+
+describe('$normalizeOutlineItemChildOrder / $appendContentBeforeNested', () => {
+  it('pulls stranded title text back before nested rows', () => {
+    const editor = setupEditor(
+      dayDoc([item('a', 'Title', [item('a1', 'Child')])]),
+    );
+    withItems(editor, ['a'], ([a]) => {
+      // Simulate contenteditable corruption: text appended after nested child.
+      a.append($createTextNode('Stranded'));
+      const children = a.getChildren();
+      expect($isOutlineItemNode(children[1])).toBe(true);
+      expect($isTextNode(children[2])).toBe(true);
+      $normalizeOutlineItemChildOrder(a);
+    });
+    editor.getEditorState().read(() => {
+      const a = $collectOutlineItemsDFS($getRoot()).find((n) => n.getId() === 'a');
+      expect(a).toBeTruthy();
+      const content = $getContentChildren(a!);
+      const nested = $getNestedItems(a!);
+      // Lexical merges adjacent text siblings after the reorder.
+      expect(content.map((c) => c.getTextContent()).join('')).toBe(
+        'TitleStranded',
+      );
+      expect(nested.map((n) => n.getId())).toEqual(['a1']);
+      // All content precedes the first nested row.
+      const kids = a!.getChildren();
+      const firstNestedIdx = kids.findIndex($isOutlineItemNode);
+      expect(
+        kids.slice(0, firstNestedIdx).every((c) => !$isOutlineItemNode(c)),
+      ).toBe(true);
+      expect(kids.slice(firstNestedIdx).every($isOutlineItemNode)).toBe(true);
+    });
+  });
+
+  it('appends merge content before nested rows', () => {
+    const editor = setupEditor(
+      dayDoc([item('a', 'Hello', [item('a1', 'Child')])]),
+    );
+    withItems(editor, ['a'], ([a]) => {
+      $appendContentBeforeNested(a, [$createTextNode(' World')]);
+    });
+    editor.getEditorState().read(() => {
+      const a = $collectOutlineItemsDFS($getRoot()).find((n) => n.getId() === 'a');
+      const content = $getContentChildren(a!);
+      expect(content.map((c) => c.getTextContent()).join('')).toBe('Hello World');
+      expect($getNestedItems(a!).map((n) => n.getId())).toEqual(['a1']);
+    });
   });
 });

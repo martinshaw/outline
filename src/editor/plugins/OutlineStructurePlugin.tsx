@@ -18,14 +18,16 @@ import { createId } from '../../utils/id';
 import {
   $createOutlineItemNode,
   $isOutlineItemNode,
-  type OutlineItemNode,
+  OutlineItemNode,
 } from '../nodes/OutlineItemNode';
 import {
+  $appendContentBeforeNested,
   $getContentChildren,
   $getNestedItems,
   $getParentOutlineItem,
   $getSelectedOutlineItem,
   $isAtStartOfItem,
+  $normalizeOutlineItemChildOrder,
 } from '../utils/outlineHelpers';
 
 /** Insert as the next sibling of `item` (same parent, immediately after). */
@@ -212,22 +214,25 @@ function $handleBackspace(): boolean {
     ) {
       prevContent[0].remove();
     }
-    for (const c of myContent) {
-      if (
+    const toMerge = myContent.filter(
+      (c) =>
         !(
           $isTextNode(c) &&
           c.getTextContent() === '' &&
           myContent.length === 1
-        )
-      ) {
-        prev.append(c);
-      }
-    }
+        ),
+    );
+    // Keep title text before nested rows (append would strand it after children).
+    $appendContentBeforeNested(prev, toMerge);
     for (const n of myNested) {
       prev.append(n);
     }
     item.remove();
-    prev.selectEnd();
+    $normalizeOutlineItemChildOrder(prev);
+    const mergedContent = $getContentChildren(prev);
+    const lastContent = mergedContent[mergedContent.length - 1];
+    if (lastContent) lastContent.selectEnd();
+    else prev.selectStart();
     return true;
   }
 
@@ -245,6 +250,9 @@ export function OutlineStructurePlugin(): null {
 
   useEffect(() => {
     return mergeRegister(
+      editor.registerNodeTransform(OutlineItemNode, (node) => {
+        $normalizeOutlineItemChildOrder(node);
+      }),
       editor.registerCommand(
         KEY_ENTER_COMMAND,
         (event) => {

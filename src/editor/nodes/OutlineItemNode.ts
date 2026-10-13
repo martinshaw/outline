@@ -238,20 +238,26 @@ export class OutlineItemNode extends ElementNode {
   }
 
   /**
-   * DOM: [attachment|chip?][editable children…][meta][progress].
-   * Leading chrome so the caret sits after previews/chips.
+   * DOM: [attachment|chip?][editable children…][flex-break?][meta][progress].
+   * Leading chrome so the caret sits after previews/chips. Trailing flex-break
+   * + meta stay outside the Lexical slot so nested rows can't land after them.
    */
   getDOMSlot(element: HTMLElement): ElementDOMSlot {
     let slot = super.getDOMSlot(element);
     const host = element as HTMLElement & {
       __outlineStatusChip?: HTMLElement | null;
       __outlineMeta?: HTMLElement | null;
+      __outlineFlexBreak?: HTMLElement | null;
       __outlineAttachment?: HTMLElement | null;
     };
     const meta =
       host.__outlineMeta?.isConnected
         ? host.__outlineMeta
         : element.querySelector(':scope > .outline-meta');
+    const flexBreak =
+      host.__outlineFlexBreak?.isConnected
+        ? host.__outlineFlexBreak
+        : element.querySelector(':scope > .outline-flex-break');
     const chip =
       host.__outlineStatusChip?.isConnected
         ? host.__outlineStatusChip
@@ -262,7 +268,9 @@ export class OutlineItemNode extends ElementNode {
         : element.querySelector(':scope > .outline-attachment');
     if (attachment) slot = slot.withAfter(attachment);
     else if (chip) slot = slot.withAfter(chip);
-    if (meta) slot = slot.withBefore(meta);
+    // Prefer the flex-break as the slot end so children stay on the title side.
+    if (flexBreak) slot = slot.withBefore(flexBreak);
+    else if (meta) slot = slot.withBefore(meta);
     return slot;
   }
 
@@ -320,6 +328,7 @@ export class OutlineItemNode extends ElementNode {
     const host = dom as HTMLElement & {
       __outlineStatusChip?: HTMLButtonElement | null;
       __outlineMeta?: HTMLButtonElement | null;
+      __outlineFlexBreak?: HTMLElement | null;
       __outlineSubtaskProgress?: HTMLElement | null;
       __outlineAttachment?: HTMLElement | null;
     };
@@ -337,6 +346,10 @@ export class OutlineItemNode extends ElementNode {
       host.__outlineMeta?.isConnected
         ? host.__outlineMeta
         : dom.querySelector<HTMLButtonElement>(':scope > .outline-meta');
+    let flexBreak =
+      host.__outlineFlexBreak?.isConnected
+        ? host.__outlineFlexBreak
+        : dom.querySelector<HTMLElement>(':scope > .outline-flex-break');
     let progress =
       host.__outlineSubtaskProgress?.isConnected
         ? host.__outlineSubtaskProgress
@@ -349,9 +362,11 @@ export class OutlineItemNode extends ElementNode {
     if (this.__kind === 'attachment' && this.__attachment) {
       chip?.remove();
       meta?.remove();
+      flexBreak?.remove();
       progress?.remove();
       host.__outlineStatusChip = null;
       host.__outlineMeta = null;
+      host.__outlineFlexBreak = null;
       host.__outlineSubtaskProgress = null;
       dom.classList.remove('outline-item--has-meta');
       this.syncAttachmentChrome(dom, host, attachmentEl);
@@ -364,9 +379,11 @@ export class OutlineItemNode extends ElementNode {
     if (!isRoleKind(this.__kind)) {
       chip?.remove();
       meta?.remove();
+      flexBreak?.remove();
       progress?.remove();
       host.__outlineStatusChip = null;
       host.__outlineMeta = null;
+      host.__outlineFlexBreak = null;
       host.__outlineSubtaskProgress = null;
       dom.classList.remove('outline-item--has-meta');
       return;
@@ -409,7 +426,19 @@ export class OutlineItemNode extends ElementNode {
     } else if (meta.parentElement !== dom) {
       dom.appendChild(meta);
     }
-    // Chip first; meta + progress trail. Children sit between (getDOMSlot).
+
+    if (!flexBreak) {
+      flexBreak = document.createElement('span');
+      flexBreak.className = 'outline-flex-break';
+      flexBreak.contentEditable = 'false';
+      flexBreak.setAttribute('aria-hidden', 'true');
+      dom.appendChild(flexBreak);
+    } else if (flexBreak.parentElement !== dom) {
+      dom.appendChild(flexBreak);
+    }
+    host.__outlineFlexBreak = flexBreak;
+
+    // Chip first; flex-break + meta + progress trail. Children sit between.
     const progressLabel =
       this.__kind === 'task'
         ? (() => {
@@ -440,6 +469,7 @@ export class OutlineItemNode extends ElementNode {
     }
 
     // Keep trailing chrome after Lexical children (chip already leads).
+    dom.appendChild(flexBreak);
     dom.appendChild(meta);
     if (progress) dom.appendChild(progress);
     host.__outlineMeta = meta;
