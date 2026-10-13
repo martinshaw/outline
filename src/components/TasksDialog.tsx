@@ -1,5 +1,6 @@
 import {
   useCallback,
+  useDeferredValue,
   useEffect,
   useId,
   useMemo,
@@ -19,6 +20,7 @@ import {
   formatDeadlineLabel,
   isDeadlineOverdue,
 } from '../utils/itemMeta';
+import type { StatusDef } from '../settings/types';
 import {
   filterTasks,
   indexTasks,
@@ -52,14 +54,23 @@ function rowKey(row: IndexedTask): string {
   return `${row.date}:${row.itemId}`;
 }
 
-const DEFAULT_FILTERS: TaskFilters = {
-  query: '',
-  kind: 'all',
-  statuses: [],
-  entities: [],
-  deadline: 'any',
-  hideCompleted: true,
-};
+/** Default status chips: everything except done / archived. */
+function defaultOpenStatusIds(statusDefs: readonly StatusDef[]): string[] {
+  return statusDefs
+    .filter((s) => s.id !== 'done' && s.id !== 'archived')
+    .map((s) => s.id);
+}
+
+function defaultTaskFilters(statusDefs: readonly StatusDef[]): TaskFilters {
+  return {
+    query: '',
+    kind: 'all',
+    statuses: defaultOpenStatusIds(statusDefs),
+    entities: [],
+    deadline: 'any',
+    hideCompleted: false,
+  };
+}
 
 const DEFAULT_SORT: TaskSort = { key: 'date', dir: 'desc' };
 /** How many frequency-ranked entities to show before “More”. */
@@ -112,7 +123,10 @@ export function TasksDialog({
   const searchId = useId();
   const closeRef = useRef<HTMLButtonElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
-  const [filters, setFilters] = useState<TaskFilters>(DEFAULT_FILTERS);
+  const tableWrapRef = useRef<HTMLDivElement>(null);
+  const [filters, setFilters] = useState<TaskFilters>(() =>
+    defaultTaskFilters(getSettings().statuses),
+  );
   const [sort, setSort] = useState<TaskSort>(DEFAULT_SORT);
   const [activeIndex, setActiveIndex] = useState(0);
   const [statuses, setStatuses] = useState(() => getSettings().statuses);
@@ -122,6 +136,7 @@ export function TasksDialog({
   );
   const selectionAnchorRef = useRef<number | null>(null);
   const [bulkBusy, setBulkBusy] = useState(false);
+  const deferredQuery = useDeferredValue(filters.query);
 
   useEffect(() => {
     return subscribeSettings((next) => setStatuses(next.statuses));
@@ -129,7 +144,7 @@ export function TasksDialog({
 
   useEffect(() => {
     if (!open) return;
-    setFilters(DEFAULT_FILTERS);
+    setFilters(defaultTaskFilters(getSettings().statuses));
     setSort(DEFAULT_SORT);
     setActiveIndex(0);
     setEntitiesExpanded(false);
@@ -191,14 +206,26 @@ export function TasksDialog({
   }, [entitiesExpanded, visibleEntities]);
 
   const rows = useMemo(() => {
-    return sortTasks(filterTasks(indexed, filters), sort);
-  }, [indexed, filters, sort]);
+    return sortTasks(
+      filterTasks(indexed, { ...filters, query: deferredQuery }),
+      sort,
+    );
+  }, [indexed, filters, deferredQuery, sort]);
 
   useEffect(() => {
     setActiveIndex((i) =>
       rows.length === 0 ? 0 : Math.min(i, rows.length - 1),
     );
   }, [rows.length]);
+
+  useEffect(() => {
+    const wrap = tableWrapRef.current;
+    if (!wrap) return;
+    const el = wrap.querySelector<HTMLElement>(
+      `[data-tasks-index="${activeIndex}"]`,
+    );
+    el?.scrollIntoView({ block: 'nearest' });
+  }, [activeIndex]);
 
   // Drop selections that scrolled out of the filtered list.
   useEffect(() => {
@@ -361,19 +388,43 @@ export function TasksDialog({
   const onTableKeyDown = useCallback(
     (event: KeyboardEvent) => {
       if (rows.length === 0) return;
+      const target = event.target;
+      const inSelect =
+        target instanceof HTMLSelectElement ||
+        (target instanceof HTMLElement && target.closest('select'));
+      if (inSelect) return;
+
+      const inTextField =
+        target instanceof HTMLInputElement &&
+        target.type !== 'checkbox' &&
+        target.type !== 'radio';
+
       if (event.key === 'ArrowDown') {
         event.preventDefault();
         setActiveIndex((i) => Math.min(i + 1, rows.length - 1));
       } else if (event.key === 'ArrowUp') {
         event.preventDefault();
         setActiveIndex((i) => Math.max(i - 1, 0));
-      } else if (event.key === 'Enter') {
+      } else if (event.key === 'Home' && !inTextField) {
+        event.preventDefault();
+        setActiveIndex(0);
+      } else if (event.key === 'End' && !inTextField) {
+        event.preventDefault();
+        setActiveIndex(rows.length - 1);
+      } else if (event.key === 'Enter' && !inTextField) {
         event.preventDefault();
         const row = rows[activeIndex];
         if (row) openRow(row);
+      } else if (
+        event.key === ' ' &&
+        !inTextField &&
+        !(target instanceof HTMLInputElement && target.type === 'checkbox')
+      ) {
+        event.preventDefault();
+        onToggleCheck(activeIndex, event.shiftKey);
       }
     },
-    [activeIndex, openRow, rows],
+    [activeIndex, onToggleCheck, openRow, rows],
   );
 
   if (!open) return null;
@@ -464,21 +515,6 @@ export function TasksDialog({
               <option value="upcoming">Upcoming</option>
               <option value="none">No deadline</option>
             </select>
-
-            <label
-              className="tasks-dialog__switch"
-              title="Hide completed tasks"
-            >
-              <input
-                type="checkbox"
-                checked={filters.hideCompleted}
-                onChange={(e) =>
-                  patchFilters({ hideCompleted: e.target.checked })
-                }
-              />
-              <span className="tasks-dialog__switch-track" aria-hidden="true" />
-              <span className="tasks-dialog__switch-label">Hide done</span>
-            </label>
           </div>
 
           <div className="tasks-dialog__row tasks-dialog__row--chips">
@@ -567,7 +603,7 @@ export function TasksDialog({
           </div>
         </div>
 
-        <div className="tasks-dialog__table-wrap">
+        <div className="tasks-dialog__table-wrap" ref={tableWrapRef}>
           {rows.length === 0 ? (
             <p className="tasks-dialog__empty">
               {indexed.length === 0
@@ -643,6 +679,7 @@ export function TasksDialog({
                   return (
                     <tr
                       key={key}
+                      data-tasks-index={index}
                       className={rowClass}
                       onMouseEnter={() => setActiveIndex(index)}
                       onClick={() => openRow(row)}
@@ -786,8 +823,9 @@ export function TasksDialog({
             {selectedCount > 0 ? ` · ${selectedCount} selected` : ''}
           </span>
           <span className="tasks-dialog__footer-hint">
-            <kbd>⇧</kbd> click range · <kbd>↑</kbd>
-            <kbd>↓</kbd> · <kbd>Enter</kbd> open
+            <kbd>↑</kbd>
+            <kbd>↓</kbd> move · <kbd>Space</kbd> select · <kbd>⇧</kbd> range ·{' '}
+            <kbd>↵</kbd> open
           </span>
         </footer>
       </div>

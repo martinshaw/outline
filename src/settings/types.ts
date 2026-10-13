@@ -65,7 +65,7 @@ export type AppSettings = {
   sidebarCollapsed: boolean;
   /** Configurable task/subtask statuses (chips + ⌘Enter cycle). */
   statuses: StatusDef[];
-  /** Configurable entity types for task/subtask links (People, Company, Project, …). */
+  /** Configurable entity types for task/subtask links (People, Company, Project, Sprint, …). */
   entityTypes: EntityTypeDef[];
   backupMode: BackupMode;
   /** Sibling directory name under the workspace root (letters, numbers, hyphens). */

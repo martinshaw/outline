@@ -1,6 +1,6 @@
 # Outline
 
-**Version 1.3.4** · [Open Outline](https://martinshaw.github.io/outline/) · [Repository](https://github.com/martinshaw/outline)
+**Version 1.4.0** · [Open Outline](https://martinshaw.github.io/outline/) · [Repository](https://github.com/martinshaw/outline)
 
 Local-first chronological outline editor inspired by [LogSeq](https://logseq.com). Notes stay on disk via the File System Access API; no account, no server, no sync backend.
 
@@ -24,6 +24,7 @@ Built with [React](https://react.dev), [Lexical](https://lexical.dev), [Vite](ht
    - [Block selection](#block-selection)
    - [Command palette](#command-palette)
    - [Tasks across notes](#tasks-across-notes)
+   - [Triage (Kanban)](#triage-kanban)
    - [Search notes](#search-notes)
    - [Settings](#settings)
 5. [Keyboard shortcuts](#keyboard-shortcuts)
@@ -49,6 +50,7 @@ Built with [React](https://react.dev), [Lexical](https://lexical.dev), [Vite](ht
 | **Nested outliner** | Indent, outdent, and reorder with LogSeq-style tree moves |
 | **Tasks & subtasks** | Promote blocks; subtasks nest under tasks |
 | **Tasks table** | Filterable cross-note task dialog (`⌘⌥T`); multi-select, bulk status, jump to an item |
+| **Triage** | Kanban triage by status (`⌘⌥B`); drag cards between columns to change status |
 | **Search** | Full-text search across all notes (`⌘⌥F`) with an inverted index |
 | **Get started hints** | Tips on empty days (local-first note); dismiss or auto-hide; restore from the command palette |
 | **Status chips** | Inline coloured chips on tasks/subtasks; configurable statuses |
@@ -152,7 +154,7 @@ On a **task** or **subtask**, `⌘Enter` / `Ctrl+Enter` **cycles status**; after
 
 Tasks and subtasks can also carry a **deadline** and linked **entities**. When set, they appear as muted text after the title (`Due Fri 11 · Ada, Acme`). Hover a task/subtask with no attributes to reveal **Deadline · Entities** at the end of the title, then click to edit. Shortcut: **`⌘⌥A` / `Ctrl+Alt+A`** (also in the command palette).
 
-**Entities** live in workspace `entities.json`. Attribute editing starts with deadline only; use **+ Add entity type** to show a multiselect for People, Company, Project, or other types from Settings → Entities (keyboard: ↑↓ / Enter / Esc). Type to pick an existing name, or press Enter when nothing matches to create a new entity of that type. Day items store **entity ids**, so the same objects can be reused across days and used to relate tasks/subtasks by shared factors.
+**Entities** live in workspace `entities.json`. Attribute editing starts with deadline only; use **+ Add entity type** to show a multiselect for People, Company, Project, Sprint, or other types from Settings → Entities (keyboard: ↑↓ / Enter / Esc). Type to pick an existing name, or press Enter when nothing matches to create a new entity of that type. Day items store **entity ids**, so the same objects can be reused across days and used to relate tasks/subtasks by shared factors.
 
 Default statuses (editable in Settings → Statuses):
 
@@ -210,6 +212,7 @@ Open with **`⌘P` / `Ctrl+P`**. Type to filter; `↑` `↓` and `Enter` to run.
 | **Change folder** | Pick a different notes directory |
 | **Insert test hierarchy** | Sample nested outline (only when developer mode is on) |
 | **Manage tasks** | Filterable table of tasks/subtasks across notes (`⌘⌥T`) |
+| **Open triage** | Kanban columns by status; drag to change status (`⌘⌥B`) |
 | **Search notes** | Full-text search across every day (`⌘⌥F`) |
 | **Show get started hints** | Restore empty-day tips above the editor |
 | **Keyboard shortcuts** | Same as `?` or `⌘/` / `Ctrl+/` |
@@ -226,14 +229,26 @@ Open with **`⌘⌥T` / `Ctrl+Alt+T`**, the command palette (**Manage tasks**), 
 
 The dialog indexes every task and subtask in the loaded notes cache and shows them in a filterable table:
 
-- Search by title, note date, status, parent task, or entity
+- Search by title, note date, status, parent task, or entity (query filtering is deferred so typing stays responsive)
 - Filter by kind, deadline (overdue / today / upcoming / none), and status chips
 - Filter by **common entities** (frequency-ranked chips; expand for all used entities by type)
-- Hide completed (done / archived) by default
+- Status chips default to all statuses except **Done** and **Archived** (no separate “Hide done” toggle)
 - Sort by note, title, kind, status, or deadline
 - Change status inline (saves the day file)
 - Finder-style multi-select and **bulk status** updates for the selection
+- Keyboard: `↑` / `↓` move, `Home` / `End` jump, `Space` toggle select (with `⇧` for ranges), `Enter` open
 - Click a row (or `Enter`) to jump to that item in the editor
+
+### Triage (Kanban)
+
+Open with **`⌘⌥B` / `Ctrl+Alt+B`**, the command palette (**Open triage**), or the top-right hint.
+
+Same task index as the table, laid out as one column per configured status:
+
+- Search and filter by kind, deadline, and entities (status is the columns; query filtering is deferred)
+- Drag a card onto another column to change its status (saves the day file)
+- Keyboard: `↑` / `↓` within a column, `←` / `→` across columns, `⌥←` / `⌥→` (Alt+arrows) move status, `Enter` open
+- Click a card (or `Enter`) to jump to that item in the editor
 
 ### Search notes
 
@@ -258,7 +273,7 @@ Open **Settings** with **`⌘⌥,` / `Ctrl+Alt+,`** or from the command palette.
 | **Appearance → Collapse sidebar** | Also toggled from the command palette |
 | **Appearance → Confetti** | Celebrate when every subtask under a task becomes done/archived (on by default) |
 | **Statuses** | Labels and colours for task/subtask chips; add / remove / reset list |
-| **Entities** | Types for attribute multiselects (default People, Company, Project); catalog in `entities.json` |
+| **Entities** | Types for attribute multiselects (default People, Company, Project, Sprint); catalog in `entities.json` |
 | **Backups → When to backup** | On next day’s first write (default), or Off |
 | **Backups → Folder name** | Sibling of `notes/` (default `backups`) |
 | **Saving → Autosave delay** | 250 ms – 1.5 s |
@@ -326,6 +341,7 @@ Press `?` or `⌘/` / `Ctrl+/` in the app for the same list.
 | `⌘P` / `Ctrl+P` | Command palette (settings, exports, folder…) |
 | `⌘⌥F` / `Ctrl+Alt+F` | Search all notes |
 | `⌘⌥T` / `Ctrl+Alt+T` | Manage tasks across notes |
+| `⌘⌥B` / `Ctrl+Alt+B` | Open triage (Kanban) |
 | `⌘⌥,` / `Ctrl+Alt+,` | Open settings |
 | `⌘⌥A` / `Ctrl+Alt+A` | Edit deadline & entities (task/subtask) |
 | `?` | Open keyboard shortcuts |
@@ -425,7 +441,7 @@ Drag or paste a file onto the editor to create an **attachment** block. The bina
 
 ### Workspace entities (`entities.json`)
 
-Enumerable objects shared across the workspace. Types are configured in Settings → Entities (`entityTypes` in `settings.json`; defaults `person` / People, `company` / Company, and `project` / Project).
+Enumerable objects shared across the workspace. Types are configured in Settings → Entities (`entityTypes` in `settings.json`; defaults `person` / People, `company` / Company, `project` / Project, and `sprint` / Sprint).
 
 ```json
 {
@@ -433,7 +449,8 @@ Enumerable objects shared across the workspace. Types are configured in Settings
   "entities": [
     { "id": "…", "type": "person", "label": "Ada" },
     { "id": "…", "type": "company", "label": "Acme" },
-    { "id": "…", "type": "project", "label": "Apollo" }
+    { "id": "…", "type": "project", "label": "Apollo" },
+    { "id": "…", "type": "sprint", "label": "Sprint 12" }
   ]
 }
 ```
@@ -441,7 +458,7 @@ Enumerable objects shared across the workspace. Types are configured in Settings
 | Field | Description |
 |-------|-------------|
 | `id` | Stable id referenced by day items (`entities`) |
-| `type` | Entity kind id from settings (`person`, `company`, `project`, …) |
+| `type` | Entity kind id from settings (`person`, `company`, `project`, `sprint`, …) |
 | `label` | Display name (unique per type, case-insensitive) |
 
 ---
@@ -468,7 +485,8 @@ Enumerable objects shared across the workspace. Types are configured in Settings
   "entityTypes": [
     { "id": "person", "label": "People" },
     { "id": "company", "label": "Company" },
-    { "id": "project", "label": "Project" }
+    { "id": "project", "label": "Project" },
+    { "id": "sprint", "label": "Sprint" }
   ],
   "backupMode": "on-next-day-write",
   "backupDirectory": "backups",

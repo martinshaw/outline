@@ -2,6 +2,13 @@
 
 Notes for each tagged release, drawn from merged pull-request summaries.
 
+## 1.4.0 — 2026-10-13
+
+- Triage Kanban dialog (`⌘⌥B`): columns by status, drag cards to change status, jump to the item on open
+- Keyboard triage: ↑↓←→ navigate cards, Alt+←/→ move status, Enter open; deferred filter query + rAF drag ghost for smoother boards
+- Tasks dialog: drop Hide done; status chips default to all except Done and Archived; Home/End, Space select, scroll active row into view
+- Sprint as a default entity type; user-facing Board labels renamed to Triage; shortcut hints sorted longest-first
+
 ## 1.3.4 — 2026-10-13
 
 - Drag-select from the empty space to the right of a line (seed caret at end, then extend on drag)

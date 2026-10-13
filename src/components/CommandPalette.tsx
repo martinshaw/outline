@@ -43,6 +43,7 @@ type Props = {
   onOpenShortcuts: () => void;
   onOpenSettings: () => void;
   onOpenTasks: () => void;
+  onOpenBoard: () => void;
   onOpenSearch: () => void;
   onShowEmptyHints: () => void;
   onExportMessage?: (message: string | null) => void;
@@ -126,6 +127,7 @@ export function CommandPalette({
   onOpenShortcuts,
   onOpenSettings,
   onOpenTasks,
+  onOpenBoard,
   onOpenSearch,
   onShowEmptyHints,
   onExportMessage,
@@ -216,8 +218,16 @@ export function CommandPalette({
         group: 'Workspace',
         label: 'Manage tasks',
         hint: `${mod}${alt}T`,
-        keywords: 'task subtask table filter status deadline board',
+        keywords: 'task subtask table filter status deadline',
         run: run(onOpenTasks),
+      },
+      {
+        id: 'board',
+        group: 'Workspace',
+        label: 'Open triage',
+        hint: `${mod}${alt}B`,
+        keywords: 'kanban triage columns status drag drop board',
+        run: run(onOpenBoard),
       },
       {
         id: 'search',
@@ -354,6 +364,7 @@ export function CommandPalette({
     onOpenSettings,
     onOpenShortcuts,
     onOpenTasks,
+    onOpenBoard,
     onOpenSearch,
     onShowEmptyHints,
     runExport,

@@ -74,6 +74,10 @@ const TasksDialog = lazy(async () => {
   const m = await import('./components/TasksDialog');
   return { default: m.TasksDialog };
 });
+const BoardDialog = lazy(async () => {
+  const m = await import('./components/BoardDialog');
+  return { default: m.BoardDialog };
+});
 const DebugOverlay = lazy(async () => {
   const m = await import('./components/DebugOverlay');
   return { default: m.DebugOverlay };
@@ -106,6 +110,7 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [tasksOpen, setTasksOpen] = useState(false);
+  const [boardOpen, setBoardOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [developerMode, setDeveloperMode] = useState(
     () => getSettings().developerMode,
@@ -234,9 +239,17 @@ export default function App() {
         settingsOpen ||
         shortcutsOpen ||
         tasksOpen ||
+        boardOpen ||
         searchOpen,
     );
-  }, [paletteOpen, settingsOpen, shortcutsOpen, tasksOpen, searchOpen]);
+  }, [
+    paletteOpen,
+    settingsOpen,
+    shortcutsOpen,
+    tasksOpen,
+    boardOpen,
+    searchOpen,
+  ]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -296,6 +309,18 @@ export default function App() {
       ) {
         event.preventDefault();
         setTasksOpen((open) => !open);
+        return;
+      }
+
+      // ⌘⌥B / Ctrl+Alt+B — open Kanban triage.
+      if (
+        event.code === 'KeyB' &&
+        (event.metaKey || event.ctrlKey) &&
+        event.altKey &&
+        !event.shiftKey
+      ) {
+        event.preventDefault();
+        setBoardOpen((open) => !open);
         return;
       }
 
@@ -571,6 +596,7 @@ export default function App() {
   const openShortcuts = useCallback(() => setShortcutsOpen(true), []);
   const openSettings = useCallback(() => setSettingsOpen(true), []);
   const openTasks = useCallback(() => setTasksOpen(true), []);
+  const openBoard = useCallback(() => setBoardOpen(true), []);
   const openSearch = useCallback(() => {
     searchOpenRef.current = true;
     bumpSearchIndex();
@@ -704,6 +730,7 @@ export default function App() {
         onOpenShortcuts={openShortcuts}
         onOpenSettings={openSettings}
         onOpenTasks={openTasks}
+        onOpenBoard={openBoard}
         onOpenSearch={openSearch}
       />
       <div className="app__body">
@@ -765,6 +792,7 @@ export default function App() {
             onOpenShortcuts={openShortcuts}
             onOpenSettings={openSettings}
             onOpenTasks={openTasks}
+            onOpenBoard={openBoard}
             onOpenSearch={openSearch}
             onShowEmptyHints={showEmptyHints}
             onExportMessage={onExportMessage}
@@ -790,6 +818,15 @@ export default function App() {
             onSelectItem={selectItem}
             onChangeStatus={changeTaskStatus}
             onChangeStatuses={changeTaskStatuses}
+          />
+        )}
+        {boardOpen && (
+          <BoardDialog
+            open
+            onClose={() => setBoardOpen(false)}
+            docs={taskDocs}
+            onSelectItem={selectItem}
+            onChangeStatus={changeTaskStatus}
           />
         )}
         {searchOpen && (

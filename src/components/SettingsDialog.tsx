@@ -434,8 +434,8 @@ export function SettingsDialog({ open, onClose }: Props) {
                 <p className="settings-field__hint">
                   Types shown as separate multiselects when editing task/subtask
                   attributes. Catalog values live in workspace{' '}
-                  <code>entities.json</code>. Defaults are People, Company, and
-                  Project.
+                  <code>entities.json</code>. Defaults are People, Company,
+                  Project, and Sprint.
                 </p>
                 <ul className="settings-entity-type-list">
                   {settings.entityTypes.map((typeDef, index) => (
