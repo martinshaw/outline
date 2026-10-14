@@ -59,11 +59,13 @@ export type DayDocument = {
 export type SidebarSubtask = {
   id: string;
   title: string;
+  status: string | null;
 };
 
 export type SidebarTask = {
   id: string;
   title: string;
+  status: string | null;
   subtasks: SidebarSubtask[];
 };
 

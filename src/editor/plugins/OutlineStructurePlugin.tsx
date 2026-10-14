@@ -28,6 +28,7 @@ import {
   $getSelectedOutlineItem,
   $isAtStartOfItem,
   $normalizeOutlineItemChildOrder,
+  $syncAllRoleKindsToNesting,
 } from '../utils/outlineHelpers';
 
 /** Insert as the next sibling of `item` (same parent, immediately after). */
@@ -68,6 +69,7 @@ function $outdentItem(item: OutlineItemNode): boolean {
   } else {
     parent.insertAfter(item);
   }
+  $syncAllRoleKindsToNesting();
   item.selectStart();
   return true;
 }

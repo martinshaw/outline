@@ -1,5 +1,7 @@
-import { memo } from 'react';
+import { memo, type CSSProperties } from 'react';
+import { getStatusDef } from '../settings/settingsStore';
 import type { SidebarDay } from '../types';
+import { isCompleteStatus } from '../utils/itemMeta';
 
 type Props = {
   days: SidebarDay[];
@@ -8,6 +10,17 @@ type Props = {
   onSelectDay: (date: string) => void | Promise<void>;
   onSelectItem: (date: string, itemId: string) => void | Promise<void>;
 };
+
+function statusStyle(status: string | null | undefined): {
+  color: string;
+  done: boolean;
+} {
+  const def = getStatusDef(status);
+  return {
+    color: def.color,
+    done: isCompleteStatus(def.id),
+  };
+}
 
 export const Sidebar = memo(function Sidebar({
   days,
@@ -40,36 +53,64 @@ export const Sidebar = memo(function Sidebar({
                 </button>
                 {day.tasks.length > 0 && (
                   <ul className="sidebar__tasks">
-                    {day.tasks.map((task) => (
-                      <li key={task.id}>
-                        <button
-                          type="button"
-                          className="sidebar__task-btn"
-                          onClick={() => onSelectItem(day.date, task.id)}
-                        >
-                          <span className="sidebar__marker sidebar__marker--task" />
-                          {task.title}
-                        </button>
-                        {task.subtasks.length > 0 && (
-                          <ul className="sidebar__subtasks">
-                            {task.subtasks.map((subtask) => (
-                              <li key={subtask.id}>
-                                <button
-                                  type="button"
-                                  className="sidebar__subtask-btn"
-                                  onClick={() =>
-                                    onSelectItem(day.date, subtask.id)
-                                  }
-                                >
-                                  <span className="sidebar__marker sidebar__marker--subtask" />
-                                  {subtask.title}
-                                </button>
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                      </li>
-                    ))}
+                    {day.tasks.map((task) => {
+                      const taskStatus = statusStyle(task.status);
+                      return (
+                        <li key={task.id}>
+                          <button
+                            type="button"
+                            className={
+                              taskStatus.done
+                                ? 'sidebar__task-btn sidebar__task-btn--done'
+                                : 'sidebar__task-btn'
+                            }
+                            onClick={() => onSelectItem(day.date, task.id)}
+                          >
+                            <span
+                              className="sidebar__marker sidebar__marker--task"
+                              style={
+                                {
+                                  '--status-color': taskStatus.color,
+                                } as CSSProperties
+                              }
+                            />
+                            {task.title}
+                          </button>
+                          {task.subtasks.length > 0 && (
+                            <ul className="sidebar__subtasks">
+                              {task.subtasks.map((subtask) => {
+                                const subStatus = statusStyle(subtask.status);
+                                return (
+                                  <li key={subtask.id}>
+                                    <button
+                                      type="button"
+                                      className={
+                                        subStatus.done
+                                          ? 'sidebar__subtask-btn sidebar__subtask-btn--done'
+                                          : 'sidebar__subtask-btn'
+                                      }
+                                      onClick={() =>
+                                        onSelectItem(day.date, subtask.id)
+                                      }
+                                    >
+                                      <span
+                                        className="sidebar__marker sidebar__marker--subtask"
+                                        style={
+                                          {
+                                            '--status-color': subStatus.color,
+                                          } as CSSProperties
+                                        }
+                                      />
+                                      {subtask.title}
+                                    </button>
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          )}
+                        </li>
+                      );
+                    })}
                   </ul>
                 )}
               </li>

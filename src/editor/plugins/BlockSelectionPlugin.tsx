@@ -49,28 +49,6 @@ function findDragHandle(target: EventTarget | null): HTMLElement | null {
   return target.closest('.outline-block-handle');
 }
 
-function caretInTextAtPoint(x: number, y: number, root: HTMLElement): boolean {
-  const doc = document as Document & {
-    caretRangeFromPoint?: (x: number, y: number) => Range | null;
-    caretPositionFromPoint?: (
-      x: number,
-      y: number,
-    ) => { offsetNode: Node; offset: number } | null;
-  };
-  let node: Node | null = null;
-  if (typeof doc.caretRangeFromPoint === 'function') {
-    node = doc.caretRangeFromPoint(x, y)?.startContainer ?? null;
-  } else if (typeof doc.caretPositionFromPoint === 'function') {
-    node = doc.caretPositionFromPoint(x, y)?.offsetNode ?? null;
-  }
-  if (!node || !root.contains(node)) return false;
-  if (node.nodeType === Node.TEXT_NODE) return true;
-  return (
-    node instanceof Element &&
-    !!node.closest('[data-lexical-text="true"]')
-  );
-}
-
 function isGutterClick(event: MouseEvent, dom: HTMLElement): boolean {
   if (!(event.target instanceof Element)) return false;
   if (
@@ -91,16 +69,16 @@ function isGutterClick(event: MouseEvent, dom: HTMLElement): boolean {
   if (event.target !== dom && event.target.tagName !== 'BR') {
     return false;
   }
-  // Flex-shrunk title spans can miss hit-tests; trust the caret when it
-  // resolves into text even though the event target is the row.
-  if (caretInTextAtPoint(event.clientX, event.clientY, dom)) {
-    return false;
-  }
   const rect = dom.getBoundingClientRect();
   // Match each row’s real leading pad (nested rows are much narrower than root),
   // inset a few px so the first text glyphs stay in the text-select zone.
   const pad = parseFloat(getComputedStyle(dom).paddingLeft) || 0;
-  return event.clientX - rect.left < Math.max(0, pad - 5);
+  const inPadZone = event.clientX - rect.left < Math.max(0, pad - 5);
+  // Geometry wins: browsers often map caretRangeFromPoint from the label
+  // column into the title text, which used to disable gutter selection.
+  if (inPadZone) return true;
+  // Content-area row hits (flex-shrunk glyphs) are never the block gutter.
+  return false;
 }
 
 function outlineIdFromTarget(target: EventTarget | null): string | null {
@@ -605,6 +583,16 @@ export function BlockSelectionPlugin(): null {
       if (
         event.target instanceof Node &&
         (root?.contains(event.target) || shell?.contains(event.target))
+      ) {
+        return;
+      }
+      // Keep block selection while using the command palette / dialogs so
+      // “Export selection” still sees the chosen rows.
+      if (
+        event.target instanceof Element &&
+        event.target.closest(
+          '[role="dialog"], .command-palette-overlay, .toast-host',
+        )
       ) {
         return;
       }

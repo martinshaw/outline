@@ -102,7 +102,9 @@ export function PersistencePlugin({
     };
 
     return editor.registerUpdateListener(({ dirtyElements, dirtyLeaves, tags }) => {
-      if (tags.has('historic') || tags.has('load') || tags.has('block-selection')) {
+      // Undo/redo (`historic`) must still sync cache + disk — otherwise export
+      // and sidebar keep pre-undo content until the next non-historic edit.
+      if (tags.has('load') || tags.has('block-selection')) {
         return;
       }
       if (dirtyElements.size === 0 && dirtyLeaves.size === 0) return;

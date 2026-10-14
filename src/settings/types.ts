@@ -59,6 +59,12 @@ export const FONT_SIZE_MAX = 1.4;
 export const FONT_SIZE_STEP = 0.05;
 export const FONT_SIZE_DEFAULT = 1.05;
 
+/** Outline nest step in rem (`--outline-indent` / `--outline-nest`). */
+export const INDENT_WIDTH_MIN = 0.75;
+export const INDENT_WIDTH_MAX = 2.5;
+export const INDENT_WIDTH_STEP = 0.05;
+export const INDENT_WIDTH_DEFAULT = 1.25;
+
 export const DEFAULT_STATUSES: StatusDef[] = [
   { id: 'backlog', label: 'Backlog', color: '#6b7280' },
   { id: 'todo', label: 'To do', color: '#3b82f6' },
@@ -77,6 +83,8 @@ export type AppSettings = {
   systemFontFamily: string | null;
   /** Editor font size in rem (see FONT_SIZE_* constants). */
   fontSize: number;
+  /** Per-level outline indent width in rem (see INDENT_WIDTH_* constants). */
+  indentWidth: number;
   theme: ThemeId;
   /** Whether the notes sidebar starts collapsed. */
   sidebarCollapsed: boolean;
@@ -201,6 +209,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   font: 'source-serif',
   systemFontFamily: null,
   fontSize: FONT_SIZE_DEFAULT,
+  indentWidth: INDENT_WIDTH_DEFAULT,
   theme: 'system',
   sidebarCollapsed: true,
   statuses: DEFAULT_STATUSES.map((s) => ({ ...s })),

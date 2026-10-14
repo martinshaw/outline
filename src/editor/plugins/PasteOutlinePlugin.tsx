@@ -5,7 +5,10 @@ import {
   beginPasteIdRemap,
   endPasteIdRemap,
 } from '../outlineIdRemap';
-import { $repairDuplicateOutlineIds } from '../utils/outlineHelpers';
+import {
+  $repairDuplicateOutlineIds,
+  $syncAllRoleKindsToNesting,
+} from '../utils/outlineHelpers';
 
 /**
  * During paste, remapping outline ids so copied tasks/notes become independent
@@ -23,6 +26,7 @@ export function PasteOutlinePlugin(): null {
           endPasteIdRemap();
           editor.update(() => {
             $repairDuplicateOutlineIds();
+            $syncAllRoleKindsToNesting();
           });
         });
         return false;

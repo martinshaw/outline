@@ -3,6 +3,7 @@ import { DAY_DOCUMENT_VERSION } from '../types';
 import type { DayDocument, OutlineItem } from '../types';
 import {
   buildSidebarFromDocs,
+  ensureTodayInSidebar,
   extractSidebarDay,
   isDayEmpty,
   itemTitle,
@@ -132,9 +133,10 @@ describe('extractSidebarDay / buildSidebarFromDocs', () => {
       {
         id: 't1',
         title: 'Parent',
+        status: 'todo',
         subtasks: [
-          { id: 's1', title: 'One' },
-          { id: 's2', title: 'Two' },
+          { id: 's1', title: 'One', status: 'todo' },
+          { id: 's2', title: 'Two', status: 'todo' },
         ],
       },
     ]);
@@ -157,5 +159,22 @@ describe('sidebarDaysEqual', () => {
     const c = extractSidebarDay(doc('2026-01-01', [task('t', 'T', [subtask('s', 'X')])]));
     expect(sidebarDaysEqual(a, b)).toBe(true);
     expect(sidebarDaysEqual(a, c)).toBe(false);
+  });
+});
+
+describe('ensureTodayInSidebar', () => {
+  it('pins today when missing', () => {
+    const days = ensureTodayInSidebar(
+      [extractSidebarDay(doc('2026-01-01', [note('a', 'old')]))],
+      '2026-01-14',
+    );
+    expect(days.map((d) => d.date)).toEqual(['2026-01-14', '2026-01-01']);
+  });
+
+  it('is a no-op when today is already listed', () => {
+    const existing = extractSidebarDay(doc('2026-01-14', [note('a', 'x')]));
+    const days = ensureTodayInSidebar([existing], '2026-01-14');
+    expect(days).toHaveLength(1);
+    expect(days[0]).toBe(existing);
   });
 });

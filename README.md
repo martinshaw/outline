@@ -1,6 +1,6 @@
 # Outline
 
-**Version 1.5.0** · [Open Outline](https://martinshaw.github.io/outline/) · [Repository](https://github.com/martinshaw/outline)
+**Version 1.5.1** · [Open Outline](https://martinshaw.github.io/outline/) · [Repository](https://github.com/martinshaw/outline)
 
 Local-first chronological outline editor inspired by [LogSeq](https://logseq.com). Notes stay on disk via the File System Access API; no account, no server, no sync backend.
 

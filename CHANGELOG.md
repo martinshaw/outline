@@ -2,6 +2,16 @@
 
 Notes for each tagged release, drawn from merged pull-request summaries.
 
+## 1.5.1 — 2026-10-14
+
+- Fix end-of-line caret placement so clicks past title/hints land at the end of that row (not the next nested item)
+- Keep empty task/subtask rows selectable; dim empty bullets; stop copying empty “Deadline · Entities” chrome
+- Pin today in the sidebar without restart; status-coloured bullets with strikethrough for done
+- Configurable outline indent width in Settings; persist undo/redo so export selection stays current
+- Keep block selection while using the command palette so “Export selection” works
+- Sync task/subtask kinds to nesting after move, indent, outdent, drag-drop, and paste (top-level role → task; under a task → subtask)
+- Restore left-gutter block selection (subtree, then self-only on second click) without breaking end-of-line caret placement (#21)
+
 ## 1.5.0 — 2026-10-13
 
 - Idle WebGL screensaver with Settings controls (enable, idle delay including 10–45s, mode picker, Preview)

@@ -274,7 +274,8 @@ export class OutlineItemNode extends ElementNode {
     return slot;
   }
 
-  private applyDomAttrs(dom: HTMLElement): void {
+  /** Data attrs + classes only — no live chrome (chip/meta). Used by exportDOM. */
+  private applyDataAttrs(dom: HTMLElement): void {
     dom.className = this.buildClassName();
     dom.setAttribute('data-outline-id', this.__id);
     dom.setAttribute('data-kind', this.__kind);
@@ -288,10 +289,23 @@ export class OutlineItemNode extends ElementNode {
     const labelText = kindLabelFor(this.__kind, this.__headingLevel);
     if (labelText) dom.setAttribute('data-kind-label', labelText);
     else dom.removeAttribute('data-kind-label');
+  }
+
+  private applyDomAttrs(dom: HTMLElement): void {
+    this.applyDataAttrs(dom);
     const selfOnly =
       getBlockSelectedIds().has(this.__id) && isBlockSelfOnly(this.__id);
     syncSelfOnlyHighlightVar(dom, selfOnly);
     this.syncChrome(dom);
+  }
+
+  /** True when this row has no title text (nested outline children ignored). */
+  private isContentEmpty(): boolean {
+    for (const child of this.getChildren()) {
+      if ($isOutlineItemNode(child)) continue;
+      if (child.getTextContent() !== '') return false;
+    }
+    return true;
   }
 
   /** Refresh ancestor task chrome when subtask counts / completion change. */
@@ -475,7 +489,8 @@ export class OutlineItemNode extends ElementNode {
     host.__outlineMeta = meta;
     dom.classList.toggle('outline-item--has-meta', hasMeta);
 
-    const display = hasMeta ? subline : 'Deadline · Entities';
+    // Empty hint is CSS ::before so copy/paste never picks up “Deadline · Entities”.
+    const display = hasMeta ? subline : '';
     if (meta.dataset.metaText !== display) {
       meta.dataset.metaText = display;
       meta.textContent = display;
@@ -634,6 +649,7 @@ export class OutlineItemNode extends ElementNode {
     if (this.__kind === 'heading' && this.__headingLevel) {
       parts.push(`outline-item--h${this.__headingLevel}`);
     }
+    if (this.isContentEmpty()) parts.push('outline-item--empty');
     // Prefer live store so Lexical DOM updates don't wipe selection chrome.
     const selected =
       this.__blockSelected || getBlockSelectedIds().has(this.__id);
@@ -648,9 +664,13 @@ export class OutlineItemNode extends ElementNode {
     return parts.join(' ');
   }
 
+  /**
+   * Clipboard / HTML export: attributes only. Live chip/meta chrome must not
+   * appear in copied text (e.g. “Deadline · Entities” placeholder).
+   */
   exportDOM(): DOMExportOutput {
     const element = document.createElement('div');
-    this.applyDomAttrs(element);
+    this.applyDataAttrs(element);
     return { element };
   }
 

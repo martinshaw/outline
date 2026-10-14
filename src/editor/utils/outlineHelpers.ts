@@ -15,6 +15,7 @@ import {
   OutlineItemNode,
 } from '../nodes/OutlineItemNode';
 import { createId } from '../../utils/id';
+import { isRoleKind } from '../../types';
 
 /** Nearest OutlineItemNode ancestor of a node (or itself). */
 export function $getOutlineItem(node: LexicalNode | null): OutlineItemNode | null {
@@ -119,6 +120,34 @@ export function $getNearestTaskParent(
     parent = $getParentOutlineItem(parent);
   }
   return null;
+}
+
+/**
+ * Role items: outermost = task; anything nested under a task = subtask.
+ * Notes / headings / attachments are left alone.
+ */
+export function $syncRoleKindToNesting(item: OutlineItemNode): void {
+  if (!isRoleKind(item.getKind())) return;
+  const underTask = $getNearestTaskParent(item) !== null;
+  const next = underTask ? 'subtask' : 'task';
+  if (item.getKind() !== next) item.setKind(next);
+}
+
+/** Preorder DFS so parents become tasks before children are classified. */
+export function $syncAllRoleKindsToNesting(
+  root: ElementNode = $getRoot(),
+): void {
+  for (const item of $collectOutlineItemsDFS(root)) {
+    $syncRoleKindToNesting(item);
+  }
+}
+
+/** Sync a moved/duplicated subtree (and its descendants). */
+export function $syncRoleKindsInSubtree(item: OutlineItemNode): void {
+  $syncRoleKindToNesting(item);
+  for (const child of $getNestedItems(item)) {
+    $syncRoleKindsInSubtree(child);
+  }
 }
 
 export function $isAtStartOfItem(item: OutlineItemNode): boolean {
@@ -556,6 +585,7 @@ export function $relocateOutlineItems(
   for (const t of targets) t.remove();
   if (place === 'before') $insertAllBefore(dropTarget, targets);
   else $insertAllAfter(dropTarget, targets);
+  $syncAllRoleKindsToNesting();
   return true;
 }
 
@@ -571,6 +601,7 @@ export function $indentOutlineItems(targets: OutlineItemNode[]): boolean {
   $hoistSelfOnlyMoveTargets(targets);
   $detachAll(targets);
   for (const t of targets) prev.append(t);
+  $syncAllRoleKindsToNesting();
   return true;
 }
 
@@ -608,6 +639,7 @@ export function $outdentOutlineItems(targets: OutlineItemNode[]): boolean {
   }
 
   for (const s of adopted) last.append(s);
+  $syncAllRoleKindsToNesting();
   return true;
 }
 
@@ -622,6 +654,7 @@ export function $moveOutlineItemsUp(targets: OutlineItemNode[]): boolean {
   if (prev && !targets.includes(prev)) {
     $detachAll(targets);
     $insertAllBefore(prev, targets);
+    $syncAllRoleKindsToNesting();
     return true;
   }
 
@@ -629,6 +662,7 @@ export function $moveOutlineItemsUp(targets: OutlineItemNode[]): boolean {
   if (!parent) return false;
   $detachAll(targets);
   $insertAllBefore(parent, targets);
+  $syncAllRoleKindsToNesting();
   return true;
 }
 
@@ -643,6 +677,7 @@ export function $moveOutlineItemsDown(targets: OutlineItemNode[]): boolean {
   if (next && !targets.includes(next)) {
     $detachAll(targets);
     $insertAllAfter(next, targets);
+    $syncAllRoleKindsToNesting();
     return true;
   }
 
@@ -655,10 +690,12 @@ export function $moveOutlineItemsDown(targets: OutlineItemNode[]): boolean {
     const nested = $getNestedItems(aunt);
     if (nested.length > 0) $insertAllBefore(nested[0], targets);
     else for (const t of targets) aunt.append(t);
+    $syncAllRoleKindsToNesting();
     return true;
   }
 
   $detachAll(targets);
   $insertAllAfter(parent, targets);
+  $syncAllRoleKindsToNesting();
   return true;
 }
