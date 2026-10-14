@@ -30,6 +30,9 @@ import {
   $normalizeOutlineItemChildOrder,
   $outdentOutlineItems,
   $relocateOutlineItems,
+  $findOutlineItemById,
+  $syncAllRoleKindsToNesting,
+  $syncRoleKindToNesting,
   rangeIdsBetween,
 } from './outlineHelpers';
 
@@ -356,6 +359,103 @@ describe('$relocateOutlineItems', () => {
     ).toBe(true);
     // c,d were after b; move up swaps the block before b → a, c, d, b
     expect(readIds(editor)).toEqual(['a', 'c', 'd', 'b']);
+  });
+});
+
+describe('$syncRoleKindToNesting', () => {
+  it('promotes a root subtask to task and demotes a nested task to subtask', () => {
+    const editor = setupEditor(
+      dayDoc([
+        item('s', 'Stray', [], { kind: 'subtask', status: 'todo' }),
+        item('t', 'Parent', [
+          item('inner', 'Nested task', [], { kind: 'task', status: 'todo' }),
+        ], { kind: 'task', status: 'todo' }),
+      ]),
+    );
+    editor.update(
+      () => {
+        $syncAllRoleKindsToNesting();
+      },
+      { discrete: true },
+    );
+    editor.getEditorState().read(() => {
+      const root = $getRoot();
+      expect($findOutlineItemById(root, 's')!.getKind()).toBe('task');
+      expect($findOutlineItemById(root, 't')!.getKind()).toBe('task');
+      expect($findOutlineItemById(root, 'inner')!.getKind()).toBe('subtask');
+    });
+  });
+
+  it('leaves notes alone', () => {
+    const editor = setupEditor(
+      dayDoc([
+        item('t', 'Task', [item('n', 'Note')], { kind: 'task', status: 'todo' }),
+      ]),
+    );
+    editor.update(
+      () => {
+        $syncRoleKindToNesting($findOutlineItemById($getRoot(), 'n')!);
+      },
+      { discrete: true },
+    );
+    editor.getEditorState().read(() => {
+      expect($findOutlineItemById($getRoot(), 'n')!.getKind()).toBe('note');
+    });
+  });
+
+  it('indenting a task under a task makes it a subtask', () => {
+    const editor = setupEditor(
+      dayDoc([
+        item('a', 'A', [], { kind: 'task', status: 'todo' }),
+        item('b', 'B', [], { kind: 'task', status: 'todo' }),
+      ]),
+    );
+    selectBlocks('b');
+    expect(
+      withItems(editor, ['b'], (targets) => $indentOutlineItems(targets)),
+    ).toBe(true);
+    editor.getEditorState().read(() => {
+      expect($findOutlineItemById($getRoot(), 'a')!.getKind()).toBe('task');
+      expect($findOutlineItemById($getRoot(), 'b')!.getKind()).toBe('subtask');
+    });
+  });
+
+  it('outdenting a subtask from under a task makes it a task', () => {
+    const editor = setupEditor(
+      dayDoc([
+        item('a', 'A', [
+          item('a1', 'A1', [], { kind: 'subtask', status: 'todo' }),
+        ], { kind: 'task', status: 'todo' }),
+      ]),
+    );
+    selectBlocks('a1');
+    expect(
+      withItems(editor, ['a1'], (targets) => $outdentOutlineItems(targets)),
+    ).toBe(true);
+    editor.getEditorState().read(() => {
+      expect($findOutlineItemById($getRoot(), 'a')!.getKind()).toBe('task');
+      expect($findOutlineItemById($getRoot(), 'a1')!.getKind()).toBe('task');
+    });
+  });
+
+  it('indenting a task with subtasks under a task demotes the whole role chain', () => {
+    const editor = setupEditor(
+      dayDoc([
+        item('a', 'A', [], { kind: 'task', status: 'todo' }),
+        item('b', 'B', [
+          item('b1', 'B1', [], { kind: 'subtask', status: 'todo' }),
+        ], { kind: 'task', status: 'todo' }),
+      ]),
+    );
+    selectBlocks('b');
+    expect(
+      withItems(editor, ['b'], (targets) => $indentOutlineItems(targets)),
+    ).toBe(true);
+    editor.getEditorState().read(() => {
+      expect($findOutlineItemById($getRoot(), 'a')!.getKind()).toBe('task');
+      expect($findOutlineItemById($getRoot(), 'b')!.getKind()).toBe('subtask');
+      expect($findOutlineItemById($getRoot(), 'b1')!.getKind()).toBe('subtask');
+    });
   });
 });
 
