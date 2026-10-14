@@ -17,6 +17,10 @@ import {
   FONT_SIZE_MAX,
   FONT_SIZE_MIN,
   FONT_SIZE_STEP,
+  INDENT_WIDTH_DEFAULT,
+  INDENT_WIDTH_MAX,
+  INDENT_WIDTH_MIN,
+  INDENT_WIDTH_STEP,
   SAVE_DEBOUNCE_OPTIONS,
   SCREENSAVER_IDLE_OPTIONS,
   SCREENSAVER_MODE_OPTIONS,
@@ -337,6 +341,33 @@ export function SettingsDialog({ open, onClose }: Props) {
                   <span className="settings-field__slider-ends" aria-hidden="true">
                     <span>Smaller</span>
                     <span>Larger</span>
+                  </span>
+                </label>
+
+                <label className="settings-field settings-field--footer">
+                  <span className="settings-field__label">
+                    Indent
+                    <span className="settings-field__value">
+                      {settings.indentWidth.toFixed(2)}rem
+                      {settings.indentWidth === INDENT_WIDTH_DEFAULT
+                        ? ' · default'
+                        : ''}
+                    </span>
+                  </span>
+                  <input
+                    className="settings-field__slider"
+                    type="range"
+                    min={INDENT_WIDTH_MIN}
+                    max={INDENT_WIDTH_MAX}
+                    step={INDENT_WIDTH_STEP}
+                    value={settings.indentWidth}
+                    onChange={(e) =>
+                      setSettings({ indentWidth: Number(e.target.value) })
+                    }
+                  />
+                  <span className="settings-field__slider-ends" aria-hidden="true">
+                    <span>Narrower</span>
+                    <span>Wider</span>
                   </span>
                 </label>
               </section>

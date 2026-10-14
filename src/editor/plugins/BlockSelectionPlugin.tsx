@@ -608,6 +608,16 @@ export function BlockSelectionPlugin(): null {
       ) {
         return;
       }
+      // Keep block selection while using the command palette / dialogs so
+      // “Export selection” still sees the chosen rows.
+      if (
+        event.target instanceof Element &&
+        event.target.closest(
+          '[role="dialog"], .command-palette-overlay, .toast-host',
+        )
+      ) {
+        return;
+      }
       clearBlockSelectedIds();
     };
 

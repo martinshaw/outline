@@ -42,6 +42,7 @@ import { emptyDayDocument, formatDayLabel, todayKey } from './utils/date';
 import { createDummyHierarchy } from './utils/dummyHierarchy';
 import {
   buildSidebarFromDocs,
+  ensureTodayInSidebar,
   extractSidebarDay,
   isDayEmpty,
   sidebarDaysEqual,
@@ -679,11 +680,32 @@ export default function App() {
     [changeTaskStatuses],
   );
 
-  // Prefer live sidebar; if empty, derive from cache once.
+  // Calendar day for pinning “today” in the sidebar (updates after midnight).
+  const [calendarToday, setCalendarToday] = useState(() => todayKey());
+
+  useEffect(() => {
+    const refreshToday = () => {
+      const next = todayKey();
+      setCalendarToday((prev) => (prev === next ? prev : next));
+    };
+    const interval = window.setInterval(refreshToday, 60_000);
+    window.addEventListener('focus', refreshToday);
+    document.addEventListener('visibilitychange', refreshToday);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('focus', refreshToday);
+      document.removeEventListener('visibilitychange', refreshToday);
+    };
+  }, []);
+
+  // Prefer live sidebar; if empty, derive from cache once. Always pin today.
   const displaySidebar = useMemo(() => {
-    if (sidebar.length > 0) return sidebar;
-    return buildSidebarFromDocs([...docsCache.values()]);
-  }, [sidebar, docsCache]);
+    const base =
+      sidebar.length > 0
+        ? sidebar
+        : buildSidebarFromDocs([...docsCache.values()]);
+    return ensureTodayInSidebar(base, calendarToday);
+  }, [sidebar, docsCache, calendarToday]);
 
   const taskDocs = useMemo(
     () => [...docsCache.values()],

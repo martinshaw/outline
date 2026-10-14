@@ -25,6 +25,8 @@
   --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
   --editor-font-family: var(--font-display);
   --editor-font-size: 1.05rem;
+  /* Nest step between outline levels (settings → Indent) */
+  --outline-indent: 1.25rem;
   --theme-color: #1a1f1c;
   /* Light mode: soft light veil; dark mode: dark scrim */
   --dialog-backdrop: rgb(255 255 255 / 0.54);
@@ -1113,16 +1115,30 @@ button {
   height: 0.42rem;
   margin-top: 0.28rem;
   border-radius: 1px;
-  opacity: 0.75;
+  opacity: 0.85;
+  background: var(--status-color, var(--task));
+  border: 1.5px solid transparent;
+  box-sizing: border-box;
 }
 .sidebar__marker--task {
-  background: var(--task);
+  border-radius: 1px;
 }
 
 .sidebar__marker--subtask {
-  border: 1.5px solid var(--subtask);
   background: transparent;
+  border-color: var(--status-color, var(--subtask));
   border-radius: 2px;
+}
+
+.sidebar__task-btn--done,
+.sidebar__subtask-btn--done {
+  text-decoration: line-through;
+  color: color-mix(in srgb, var(--ink-muted) 78%, transparent);
+}
+
+.sidebar__task-btn--done .sidebar__marker,
+.sidebar__subtask-btn--done .sidebar__marker {
+  opacity: 0.45;
 }
 
 /* —— Main —— */
@@ -1134,8 +1150,8 @@ button {
   --outline-gutter: calc(
     var(--outline-label) + var(--outline-bullet) + var(--outline-gap)
   );
-  /* Per-level nest step only — not the full label gutter */
-  --outline-nest: 1.25rem;
+  /* Per-level nest step — overridden by settings via --outline-indent on :root */
+  --outline-nest: var(--outline-indent, 1.25rem);
   min-width: 0;
   overflow: auto;
   /* Right pad mirrors date inset (outer pad + --outline-label) */
@@ -1468,6 +1484,11 @@ body:has(.update-banner) .toast-host {
   border-color: color-mix(in srgb, var(--subtask) 75%, transparent);
 }
 
+/* Empty title: dim the bullet so filled rows stay primary */
+.outline-item--empty::before {
+  opacity: 0.28;
+}
+
 /* Kind label via ::after + data-kind-label (also not a DOM sibling) */
 .outline-item[data-kind-label]::after {
   content: attr(data-kind-label);
@@ -1586,6 +1607,15 @@ body:has(.update-banner) .toast-host {
   overflow: hidden;
   visibility: hidden;
   pointer-events: none;
+}
+
+/*
+ * Empty parent with nested children: keep a full title-line hit target so the
+ * next-level row cannot slide up into the deleted title and steal clicks.
+ */
+.outline-item--empty:has(> .outline-meta) > .outline-flex-break {
+  height: 1.15em;
+  min-height: 1.15em;
 }
 
 .outline-item:has(> .outline-meta) > .outline-item {
@@ -1868,6 +1898,10 @@ body:has(.update-banner) .toast-host {
 
 .outline-meta--empty {
   display: none;
+}
+
+.outline-meta--empty::before {
+  content: 'Deadline · Entities';
 }
 
 .outline-item:hover > .outline-meta--empty,
@@ -2400,7 +2434,6 @@ body:has(.update-banner) .toast-host {
     --sidebar-w: min(18.5rem, 86vw);
     --outline-label: 2.6rem;
     --outline-gap: 0.4rem;
-    --outline-nest: 1.05rem;
   }
 
   .app__body,

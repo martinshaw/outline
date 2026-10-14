@@ -75,4 +75,14 @@ describe('screensaver settings helpers', () => {
     });
     expect(fromJson.screensaverIdleMs).toBe(10000);
   });
+
+  it('normalizeSettings clamps indentWidth', () => {
+    expect(normalizeSettings({ indentWidth: 1.5 }).indentWidth).toBe(1.5);
+    expect(normalizeSettings({ indentWidth: 0.1 }).indentWidth).toBe(0.75);
+    expect(normalizeSettings({ indentWidth: 9 }).indentWidth).toBe(2.5);
+    expect(
+      normalizeSettings({ indentWidth: 'wide' as unknown as number })
+        .indentWidth,
+    ).toBe(1.25);
+  });
 });

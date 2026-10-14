@@ -10,6 +10,10 @@ import {
   FONT_SIZE_MAX,
   FONT_SIZE_MIN,
   FONT_SIZE_STEP,
+  INDENT_WIDTH_DEFAULT,
+  INDENT_WIDTH_MAX,
+  INDENT_WIDTH_MIN,
+  INDENT_WIDTH_STEP,
   THEME_OPTIONS,
   isScreensaverIdleMs,
   isScreensaverModeId,
@@ -73,6 +77,22 @@ export function clampFontSize(value: number): number {
   const stepped = Math.round(value / FONT_SIZE_STEP) * FONT_SIZE_STEP;
   const clamped = Math.min(FONT_SIZE_MAX, Math.max(FONT_SIZE_MIN, stepped));
   return Math.round(clamped * 100) / 100;
+}
+
+export function clampIndentWidth(value: number): number {
+  const stepped = Math.round(value / INDENT_WIDTH_STEP) * INDENT_WIDTH_STEP;
+  const clamped = Math.min(
+    INDENT_WIDTH_MAX,
+    Math.max(INDENT_WIDTH_MIN, stepped),
+  );
+  return Math.round(clamped * 100) / 100;
+}
+
+function normalizeIndentWidth(value: unknown): number {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return clampIndentWidth(value);
+  }
+  return INDENT_WIDTH_DEFAULT;
 }
 
 function slugStatusId(label: string): string {
@@ -183,6 +203,9 @@ export function normalizeSettings(
     base.systemFontFamily = normalizeSystemFontFamily(partial.systemFontFamily);
   }
   if ('fontSize' in partial) base.fontSize = normalizeFontSize(partial.fontSize);
+  if ('indentWidth' in partial) {
+    base.indentWidth = normalizeIndentWidth(partial.indentWidth);
+  }
   if (isThemeId(partial.theme)) base.theme = partial.theme;
   if (typeof partial.sidebarCollapsed === 'boolean') {
     base.sidebarCollapsed = partial.sidebarCollapsed;
@@ -272,6 +295,7 @@ export function applySettingsToDom(settings: AppSettings = current): void {
   root.style.setProperty('--font-display', fontCss);
   root.style.setProperty('--editor-font-family', fontCss);
   root.style.setProperty('--editor-font-size', `${settings.fontSize}rem`);
+  root.style.setProperty('--outline-indent', `${settings.indentWidth}rem`);
 
   if (settings.theme === 'system') {
     root.removeAttribute('data-theme');
