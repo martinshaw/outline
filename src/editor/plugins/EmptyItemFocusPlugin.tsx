@@ -277,10 +277,37 @@ function isCaretAtTextEnd(range: Range): boolean {
 }
 
 /**
- * Empty outline rows have no text hit-target. Clicks on the row (or gutter)
- * should still place a caret in that item. Clicks / drags in the trailing
- * empty space to the right of the title seed the caret at the end of the
- * line so drag-to-select works the same as starting on the last character.
+ * Left label/bullet padding — block selection owns these clicks.
+ * Keep in sync with `isGutterClick` in BlockSelectionPlugin.
+ */
+function isBlockSelectGutterClick(
+  event: MouseEvent,
+  dom: HTMLElement,
+): boolean {
+  if (!(event.target instanceof Element)) return false;
+  if (
+    event.target.closest('.outline-status-chip') ||
+    event.target.closest('.outline-status-menu') ||
+    event.target.closest('.outline-meta') ||
+    event.target.closest('.outline-meta-popover') ||
+    event.target.closest('.outline-attachment') ||
+    event.target.closest('.outline-attachment-menu') ||
+    event.target.closest('.outline-attachment-lightbox') ||
+    event.target.closest('.outline-block-handle')
+  ) {
+    return false;
+  }
+  // Padding / bullet hits the row itself (pseudos); real content is a child.
+  if (event.target !== dom && event.target.tagName !== 'BR') return false;
+  const rect = dom.getBoundingClientRect();
+  const pad = parseFloat(getComputedStyle(dom).paddingLeft) || 0;
+  return event.clientX - rect.left < Math.max(0, pad - 5);
+}
+
+/**
+ * Empty outline rows have no text hit-target. Clicks on the row (or trailing
+ * empty space) should still place a caret. Left gutter clicks are left to
+ * BlockSelectionPlugin. Trailing space seeds the caret at end of title.
  */
 export function EmptyItemFocusPlugin(): null {
   const [editor] = useLexicalComposerContext();
@@ -305,6 +332,10 @@ export function EmptyItemFocusPlugin(): null {
       ) {
         return;
       }
+
+      // Let BlockSelectionPlugin own the left label/bullet gutter.
+      const hitRow = target.closest<HTMLElement>('.outline-item');
+      if (hitRow && isBlockSelectGutterClick(event, hitRow)) return;
 
       const itemEl = outlineItemForPointer(target, event.clientX, event.clientY);
       if (!itemEl || !root.contains(itemEl)) return;

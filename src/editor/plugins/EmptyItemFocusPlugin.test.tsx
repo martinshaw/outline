@@ -2,6 +2,10 @@ import { act, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { OutlineEditor } from '../OutlineEditor';
+import {
+  getBlockSelectedIds,
+  resetBlockSelectionStore,
+} from '../blockSelectionStore';
 import { dayDoc, item } from '../test/harness';
 import type { DayDocument } from '../../types';
 
@@ -37,6 +41,69 @@ describe('EmptyItemFocusPlugin', () => {
     });
     container.remove();
     vi.restoreAllMocks();
+  });
+
+  it('does not steal left gutter mousedown (block selection)', async () => {
+    resetBlockSelectionStore();
+    const doc = dayDoc([item('a', 'Hello world')]);
+
+    await act(async () => {
+      root.render(<Host doc={doc} />);
+    });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+
+    const itemEl = container.querySelector('.outline-item') as HTMLElement;
+    vi.spyOn(itemEl, 'getBoundingClientRect').mockReturnValue({
+      x: 0,
+      y: 0,
+      top: 0,
+      left: 0,
+      bottom: 24,
+      right: 400,
+      width: 400,
+      height: 24,
+      toJSON: () => ({}),
+    });
+    const realComputed = window.getComputedStyle.bind(window);
+    vi.spyOn(window, 'getComputedStyle').mockImplementation((el) => {
+      const style = realComputed(el);
+      if (el === itemEl) {
+        return new Proxy(style, {
+          get(target, prop, receiver) {
+            if (prop === 'paddingLeft') return '60px';
+            return Reflect.get(target, prop, receiver);
+          },
+        });
+      }
+      return style;
+    });
+
+    await act(async () => {
+      itemEl.dispatchEvent(
+        new MouseEvent('mousedown', {
+          bubbles: true,
+          cancelable: true,
+          button: 0,
+          clientX: 20,
+          clientY: 12,
+        }),
+      );
+    });
+    await act(async () => {
+      window.dispatchEvent(
+        new MouseEvent('mouseup', {
+          bubbles: true,
+          cancelable: true,
+          button: 0,
+          clientX: 20,
+          clientY: 12,
+        }),
+      );
+    });
+
+    expect([...getBlockSelectedIds()]).toEqual(['a']);
   });
 
   it('places the caret at the end when clicking trailing empty space', async () => {
