@@ -340,6 +340,13 @@ export function EmptyItemFocusPlugin(): null {
       const itemEl = outlineItemForPointer(target, event.clientX, event.clientY);
       if (!itemEl || !root.contains(itemEl)) return;
 
+      // Never treat the leading pad as end-of-line (empty rows have textRight
+      // ≈ content left, which made nearOrPastTextEnd true across the gutter).
+      const itemRect = itemEl.getBoundingClientRect();
+      const pad =
+        parseFloat(getComputedStyle(itemEl).paddingLeft) || 0;
+      if (event.clientX - itemRect.left < Math.max(0, pad - 5)) return;
+
       const { top: bandTop, bottom: bandBottom } = titleRowBand(itemEl);
       const inTitleBand =
         event.clientY >= bandTop && event.clientY <= bandBottom + 2;
@@ -347,13 +354,9 @@ export function EmptyItemFocusPlugin(): null {
       const nearOrPastTextEnd = event.clientX >= textRight - 4;
       const clickRightOfTitle = event.clientX > titleRowContentRight(itemEl);
 
-      // End-of-line / trailing gutter (including past empty Deadline · Entities
-      // hints): always seed caret at end. caretRangeFromPoint often still
-      // resolves into title text or the wrapped “next line”, which is why
-      // Lexical alone places the caret wrong here.
-      //
-      // Clicks that land on real glyphs (textCaret) still win unless the
-      // pointer is clearly past the title/chip/filled-meta box.
+      // End-of-line / trailing space past chrome: seed caret at end of title.
+      // caretRangeFromPoint often still resolves into title text or a nested
+      // row — force end when the pointer is clearly past the title box.
       if (inTitleBand && (nearOrPastTextEnd || clickRightOfTitle)) {
         const endCaret = caretRangeFromPoint(event.clientX, event.clientY);
         const textCaretUnderPointer = Boolean(
